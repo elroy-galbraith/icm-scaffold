@@ -4,7 +4,7 @@ import { join } from 'node:path';
 export type RunStatus = 'completed' | 'aborted_budget' | 'error';
 
 export interface ToolCallLogEntry {
-  tool: 'read_file' | 'write_file' | 'list_dir' | 'finish_stage';
+  tool: 'read_file' | 'write_file' | 'list_dir' | 'finish_stage' | 'fetch_url' | 'run_script';
   args: Record<string, unknown>;
   result: 'ok' | 'error';
   errorMessage?: string;

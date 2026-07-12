@@ -1,11 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, realpathSync } from 'node:fs';
-import { dirname, resolve, relative, isAbsolute, extname } from 'node:path';
-
-export interface ToolDef {
-  type: 'function';
-  function: { name: string; description: string; parameters: Record<string, unknown> };
-}
+import { realpathSync } from 'node:fs';
+import { relative, extname } from 'node:path';
+import { resolveInJail } from './jail.js';
+import type { ToolDef } from './openrouter.js';
 
 export const RUN_SCRIPT_DEF: ToolDef = {
   type: 'function',
@@ -23,53 +20,6 @@ export const RUN_SCRIPT_DEF: ToolDef = {
     },
   },
 };
-
-// Mirrors platform/runner/src/jail.ts's resolveInJail/JailViolationError. Duplicated
-// because that file is owned by a parallel worktree and doesn't exist here yet — collapse
-// into a single import after merge (see INTEGRATION.md).
-export class JailViolationError extends Error {
-  constructor(public readonly attemptedPath: string) {
-    super(`Path escapes workspace jail: ${attemptedPath}`);
-    this.name = 'JailViolationError';
-  }
-}
-
-export function resolveInJail(workspaceRoot: string, relativePath: string): string {
-  const root = realpathSync(workspaceRoot);
-
-  if (isAbsolute(relativePath)) {
-    throw new JailViolationError(relativePath);
-  }
-
-  const candidate = resolve(root, relativePath);
-  assertInside(root, candidate);
-
-  const realCandidate = nearestRealPath(candidate);
-  assertInside(root, realCandidate);
-
-  return candidate;
-}
-
-function assertInside(root: string, candidate: string): void {
-  const rel = relative(root, candidate);
-  if (rel === '..' || rel.startsWith(`..${'/'}`) || isAbsolute(rel)) {
-    throw new JailViolationError(candidate);
-  }
-}
-
-function nearestRealPath(candidate: string): string {
-  let current = candidate;
-  while (!existsSync(current)) {
-    const parent = dirname(current);
-    if (parent === current) {
-      return candidate;
-    }
-    current = parent;
-  }
-  const real = realpathSync(current);
-  const suffix = relative(current, candidate);
-  return suffix ? resolve(real, suffix) : real;
-}
 
 const STAGE_SCRIPTS_SEGMENT_INDEX = 2;
 export const SCRIPT_TIMEOUT_MS = 60_000;

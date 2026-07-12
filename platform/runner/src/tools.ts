@@ -3,6 +3,8 @@ import { dirname, join } from 'node:path';
 import { resolveInJail } from './jail.js';
 import type { ToolDef } from './openrouter.js';
 import type { ToolCallLogEntry } from './runLog.js';
+import { FETCH_URL_DEF, fetchUrl } from './webTool.js';
+import { RUN_SCRIPT_DEF, runScript } from './scriptTool.js';
 
 export const TOOL_DEFS: ToolDef[] = [
   {
@@ -55,6 +57,8 @@ export const TOOL_DEFS: ToolDef[] = [
       },
     },
   },
+  FETCH_URL_DEF,
+  RUN_SCRIPT_DEF,
 ];
 
 export interface ToolContext {
@@ -64,6 +68,7 @@ export interface ToolContext {
   toolCalls: ToolCallLogEntry[];
   finished: boolean;
   gateSummary?: string;
+  allowedDomains: string[];
 }
 
 export interface ToolResult {
@@ -71,20 +76,21 @@ export interface ToolResult {
   content: string;
 }
 
-export function createToolContext(workspaceRoot: string): ToolContext {
+export function createToolContext(workspaceRoot: string, allowedDomains: string[] = []): ToolContext {
   return {
     workspaceRoot,
     filesRead: new Set(),
     filesWritten: new Set(),
     toolCalls: [],
     finished: false,
+    allowedDomains,
   };
 }
 
-export function executeTool(name: string, args: Record<string, unknown>, ctx: ToolContext): ToolResult {
+export async function executeTool(name: string, args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
   const timestamp = new Date().toISOString();
   try {
-    const content = runTool(name, args, ctx);
+    const content = await runTool(name, args, ctx);
     ctx.toolCalls.push({ tool: name as ToolCallLogEntry['tool'], args, result: 'ok', timestamp });
     return { ok: true, content };
   } catch (err) {
@@ -94,7 +100,7 @@ export function executeTool(name: string, args: Record<string, unknown>, ctx: To
   }
 }
 
-function runTool(name: string, args: Record<string, unknown>, ctx: ToolContext): string {
+async function runTool(name: string, args: Record<string, unknown>, ctx: ToolContext): Promise<string> {
   switch (name) {
     case 'read_file': {
       const path = requireString(args, 'path');
@@ -126,6 +132,19 @@ function runTool(name: string, args: Record<string, unknown>, ctx: ToolContext):
       ctx.finished = true;
       ctx.gateSummary = gateSummary;
       return 'Stage marked finished; awaiting human review.';
+    }
+    case 'fetch_url': {
+      const url = requireString(args, 'url');
+      const result = await fetchUrl(url, ctx.allowedDomains);
+      if (!result.ok) throw new Error(result.content);
+      return result.content;
+    }
+    case 'run_script': {
+      const script = requireString(args, 'script');
+      const scriptArgs = Array.isArray(args.args) ? (args.args as string[]) : [];
+      const result = runScript(ctx.workspaceRoot, script, scriptArgs);
+      if (!result.ok) throw new Error(result.content);
+      return result.content;
     }
     default:
       throw new Error(`Unknown tool: ${name}`);

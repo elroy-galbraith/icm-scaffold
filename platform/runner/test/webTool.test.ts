@@ -96,4 +96,44 @@ describe('fetchUrl', () => {
     expect(result.content).toContain('truncated');
     expect(result.content.length).toBeLessThan(600 * 1024);
   });
+
+  it('refuses IPv6-literal hosts even when nominally allowlisted', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await fetchUrl('https://[::1]/', ['::1']);
+    expect(result.ok).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses an invalid/unparseable URL without calling fetch', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await fetchUrl('not a valid url', ['example.com']);
+    expect(result.ok).toBe(false);
+    expect(result.content).toMatch(/invalid URL/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses after exhausting the redirect limit', async () => {
+    const fetchMock = vi.fn(async () =>
+      htmlResponse('', 302, { location: 'https://example.com/loop' })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await fetchUrl('https://example.com/loop', ['example.com']);
+    expect(result.ok).toBe(false);
+    expect(result.content).toMatch(/redirect/i);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
+
+  it('decodes HTML entities after stripping tags', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        htmlResponse('<p>Tom &amp; Jerry &lt;3&gt; said &quot;caf&#233;&quot;</p>')
+      )
+    );
+    const result = await fetchUrl('https://example.com/entities', ['example.com']);
+    expect(result.ok).toBe(true);
+    expect(result.content).toContain('Tom & Jerry <3> said "café"');
+  });
 });

@@ -17,6 +17,7 @@ export interface AgentLoopParams {
   tokenBudget?: number;
   maxTokens?: number;
   chatCompletionFn?: ChatCompletionFn;
+  allowedDomains?: string[];
 }
 
 export interface AgentLoopResult {
@@ -48,7 +49,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentLoopRe
   const maxTokens = params.maxTokens ?? DEFAULT_MAX_TOKENS;
   const chat = params.chatCompletionFn ?? defaultChatCompletion;
   const budget = new TokenBudget(tokenBudgetLimit);
-  const ctx: ToolContext = createToolContext(params.workspaceRoot);
+  const ctx: ToolContext = createToolContext(params.workspaceRoot, params.allowedDomains ?? []);
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt(params.stage) },
@@ -117,7 +118,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentLoopRe
           continue;
         }
 
-        const result = executeTool(call.function.name, args, ctx);
+        const result = await executeTool(call.function.name, args, ctx);
         messages.push({
           role: 'tool',
           tool_call_id: call.id,
