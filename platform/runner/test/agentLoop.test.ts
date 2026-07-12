@@ -1,0 +1,102 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, cpSync, existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runAgentLoop } from '../src/agentLoop.js';
+import type { ChatCompletionFn, ChatCompletionResult } from '../src/openrouter.js';
+
+const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/workspace', import.meta.url));
+
+interface ScriptStep {
+  toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
+  totalTokens: number;
+}
+
+function scriptedChat(script: ScriptStep[]): ChatCompletionFn {
+  let call = 0;
+  return async (): Promise<ChatCompletionResult> => {
+    const step = script[call];
+    call++;
+    if (!step) throw new Error('Script exhausted');
+    return {
+      message: {
+        role: 'assistant',
+        content: '',
+        tool_calls: step.toolCalls?.map((tc, i) => ({
+          id: `call-${call}-${i}`,
+          type: 'function' as const,
+          function: { name: tc.name, arguments: JSON.stringify(tc.args) },
+        })),
+      },
+      totalTokens: step.totalTokens,
+    };
+  };
+}
+
+describe('runAgentLoop', () => {
+  let workspaceRoot: string;
+
+  beforeEach(() => {
+    workspaceRoot = mkdtempSync(join(tmpdir(), 'agent-loop-'));
+    cpSync(FIXTURE_DIR, workspaceRoot, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('completes a stage: reads context, writes output, finishes', async () => {
+    const chat = scriptedChat([
+      { toolCalls: [{ name: 'read_file', args: { path: 'CLAUDE.md' } }], totalTokens: 50 },
+      { toolCalls: [{ name: 'read_file', args: { path: 'stages/01_research/CONTEXT.md' } }], totalTokens: 50 },
+      {
+        toolCalls: [
+          { name: 'write_file', args: { path: 'stages/01_research/output/findings.md', content: '# Findings\n' } },
+        ],
+        totalTokens: 80,
+      },
+      {
+        toolCalls: [
+          { name: 'finish_stage', args: { gateSummary: 'Findings written. Verify: has at least one finding.' } },
+        ],
+        totalTokens: 30,
+      },
+    ]);
+
+    const result = await runAgentLoop({
+      workspaceRoot,
+      stage: '01_research',
+      apiKey: 'test-key',
+      chatCompletionFn: chat,
+    });
+
+    expect(result.status).toBe('completed');
+    expect(result.filesRead).toContain('CLAUDE.md');
+    expect(result.filesWritten).toContain('stages/01_research/output/findings.md');
+    expect(result.gateSummary).toContain('Verify');
+    expect(result.tokensSpent).toBe(210);
+    expect(existsSync(join(workspaceRoot, 'stages/01_research/output/findings.md'))).toBe(true);
+    expect(readFileSync(join(workspaceRoot, 'stages/01_research/output/findings.md'), 'utf-8')).toBe(
+      '# Findings\n'
+    );
+  });
+
+  it('aborts cleanly when the token budget is exceeded', async () => {
+    const chat = scriptedChat([
+      { toolCalls: [{ name: 'read_file', args: { path: 'CLAUDE.md' } }], totalTokens: 100 },
+      { toolCalls: [{ name: 'read_file', args: { path: 'CONTEXT.md' } }], totalTokens: 100 },
+    ]);
+
+    const result = await runAgentLoop({
+      workspaceRoot,
+      stage: '01_research',
+      apiKey: 'test-key',
+      chatCompletionFn: chat,
+      tokenBudget: 150,
+    });
+
+    expect(result.status).toBe('aborted_budget');
+    expect(result.tokensSpent).toBe(200);
+  });
+});
