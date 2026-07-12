@@ -64,6 +64,9 @@ export function PipelineView() {
             stage={stage}
             workspaceLocked={data.locked}
             blockedBy={computeBlockedBy(data.stages, stage.name)}
+            isRunPending={runMutation.isPending && runMutation.variables === stage.name}
+            isApprovePending={approveMutation.isPending && approveMutation.variables === stage.name}
+            isRejectPending={rejectMutation.isPending && rejectMutation.variables?.stage === stage.name}
             onRun={(name) => runMutation.mutate(name)}
             onApprove={(name) => approveMutation.mutate(name)}
             onReject={(name, comment) => rejectMutation.mutate({ stage: name, comment })}

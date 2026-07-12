@@ -148,4 +148,69 @@ describe('StageCard', () => {
     expect(screen.getByTestId('stagecard-approve-03_report')).toBeDisabled();
     expect(screen.getByTestId('stagecard-reject-submit-03_report')).toBeDisabled();
   });
+
+  it('shows a failure banner for a pending stage whose last run errored with status "error"', () => {
+    render(
+      <StageCard
+        stage={makeStage({
+          lastRun: {
+            runId: 'run-1',
+            status: 'error',
+            endedAt: '2026-07-12T09:00:00.000Z',
+            tokensSpent: 500,
+            tokenBudget: 200000,
+            errorMessage: 'Tool call failed',
+          },
+        })}
+        workspaceLocked={false}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('stagecard-failure-03_report')).toHaveTextContent('Tool call failed');
+  });
+
+  it('disables Run while a run mutation is pending for this stage', () => {
+    render(
+      <StageCard
+        stage={makeStage()}
+        workspaceLocked={false}
+        isRunPending={true}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('stagecard-run-03_report')).toBeDisabled();
+  });
+
+  it('disables Approve while an approve mutation is pending for this stage', () => {
+    render(
+      <StageCard
+        stage={makeStage({ status: 'awaiting_review' })}
+        workspaceLocked={false}
+        isApprovePending={true}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('stagecard-approve-03_report')).toBeDisabled();
+  });
+
+  it('disables Reject-submit while a reject mutation is pending for this stage, even with a comment', () => {
+    render(
+      <StageCard
+        stage={makeStage({ status: 'awaiting_review' })}
+        workspaceLocked={false}
+        isRejectPending={true}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    fireEvent.change(screen.getByTestId('stagecard-reject-comment-03_report'), { target: { value: 'too shallow' } });
+    expect(screen.getByTestId('stagecard-reject-submit-03_report')).toBeDisabled();
+  });
 });

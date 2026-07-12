@@ -5,19 +5,32 @@ export interface StageCardProps {
   stage: StageView;
   workspaceLocked: boolean;
   blockedBy?: { stage: string; status: StageStatus } | null;
+  isRunPending?: boolean;
+  isApprovePending?: boolean;
+  isRejectPending?: boolean;
   onRun: (stage: string) => void;
   onApprove: (stage: string) => void;
   onReject: (stage: string, comment: string) => void;
 }
 
-export function StageCard({ stage, workspaceLocked, blockedBy, onRun, onApprove, onReject }: StageCardProps) {
+export function StageCard({
+  stage,
+  workspaceLocked,
+  blockedBy,
+  isRunPending = false,
+  isApprovePending = false,
+  isRejectPending = false,
+  onRun,
+  onApprove,
+  onReject,
+}: StageCardProps) {
   const [comment, setComment] = useState('');
   const failed =
     stage.status === 'pending' &&
     stage.lastRun != null &&
     (stage.lastRun.status === 'error' || stage.lastRun.status === 'aborted_budget');
 
-  const runDisabled = workspaceLocked || stage.running || blockedBy != null;
+  const runDisabled = workspaceLocked || stage.running || blockedBy != null || isRunPending;
   const runTitle = blockedBy
     ? `Blocked: ${blockedBy.stage} is ${blockedBy.status}, must be approved first.`
     : undefined;
@@ -55,7 +68,7 @@ export function StageCard({ stage, workspaceLocked, blockedBy, onRun, onApprove,
           <button
             type="button"
             data-testid={`stagecard-approve-${stage.name}`}
-            disabled={workspaceLocked}
+            disabled={workspaceLocked || isApprovePending}
             onClick={() => onApprove(stage.name)}
           >
             Approve
@@ -69,7 +82,7 @@ export function StageCard({ stage, workspaceLocked, blockedBy, onRun, onApprove,
           <button
             type="button"
             data-testid={`stagecard-reject-submit-${stage.name}`}
-            disabled={workspaceLocked || comment.trim().length === 0}
+            disabled={workspaceLocked || comment.trim().length === 0 || isRejectPending}
             onClick={() => onReject(stage.name, comment)}
           >
             Reject
