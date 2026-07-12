@@ -239,6 +239,20 @@ describe('StageCard', () => {
     expect(onViewRun).toHaveBeenCalledWith('run-1');
   });
 
+  it('hides the Run button when the stage is already awaiting_review, showing GateActions instead', () => {
+    render(
+      <StageCard
+        stage={makeStage({ status: 'awaiting_review' })}
+        workspaceLocked={false}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId('stagecard-run-03_report')).not.toBeInTheDocument();
+    expect(screen.getByTestId('gate-approve-03_report')).toBeInTheDocument();
+  });
+
   it('does not render "View last run" when there is no lastRun', () => {
     render(
       <StageCard

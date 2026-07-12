@@ -66,7 +66,7 @@ export function StageCard({
         </button>
       )}
 
-      {!stage.running && (
+      {!stage.running && stage.status !== 'awaiting_review' && (
         <button
           type="button"
           data-testid={`stagecard-run-${stage.name}`}
