@@ -1,8 +1,13 @@
 import { Router } from 'express';
 import type { WorkspaceConfig } from '../workspace.js';
 import { beginStageRun, completeStageRun, StageBlockedError, StageLockedError } from '../simulate.js';
-import { readState, updateStageState } from '../state.js';
+import { readState, updateStageState, type StageStatus } from '../state.js';
 import { commitWorkspace } from '../git.js';
+
+function getStageStatus(config: WorkspaceConfig, stage: string): StageStatus {
+  const state = readState(config.scratchDir);
+  return state.stages[stage]?.status ?? 'pending';
+}
 
 export function createStageActionsRouter(config: WorkspaceConfig, options: { runDelayMs?: number } = {}): Router {
   const router = Router();
@@ -10,6 +15,11 @@ export function createStageActionsRouter(config: WorkspaceConfig, options: { run
   router.post('/api/stages/:stage/run', (req, res) => {
     const { stage } = req.params;
     try {
+      const currentStatus = getStageStatus(config, stage);
+      if (currentStatus === 'awaiting_review') {
+        res.status(422).json({ blockingStage: stage, blockingStatus: currentStatus });
+        return;
+      }
       const { runId } = beginStageRun(config.scratchDir, stage);
       void completeStageRun({
         workspaceRoot: config.scratchDir,
@@ -34,8 +44,7 @@ export function createStageActionsRouter(config: WorkspaceConfig, options: { run
 
   router.post('/api/stages/:stage/approve', (req, res) => {
     const { stage } = req.params;
-    const state = readState(config.scratchDir);
-    const currentStatus = state.stages[stage]?.status ?? 'pending';
+    const currentStatus = getStageStatus(config, stage);
     if (currentStatus !== 'awaiting_review') {
       res.status(409).json({ stage, status: currentStatus });
       return;
@@ -52,8 +61,7 @@ export function createStageActionsRouter(config: WorkspaceConfig, options: { run
       res.status(422).json({ error: 'comment is required' });
       return;
     }
-    const state = readState(config.scratchDir);
-    const currentStatus = state.stages[stage]?.status ?? 'pending';
+    const currentStatus = getStageStatus(config, stage);
     if (currentStatus !== 'awaiting_review') {
       res.status(409).json({ stage, status: currentStatus });
       return;

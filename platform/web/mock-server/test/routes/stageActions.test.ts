@@ -82,6 +82,28 @@ describe('stage action routes', () => {
     expect(res.body.blockingStatus).toBe('pending');
   });
 
+  it('POST run returns 422 and leaves state untouched when the target stage is already awaiting_review', async () => {
+    const seededState = {
+      stages: {
+        '01_research': { status: 'approved' as const, updatedAt: '2026-07-12T09:00:00.000Z' },
+        '02_analysis': { status: 'approved' as const, updatedAt: '2026-07-12T09:00:00.000Z' },
+        '03_report': { status: 'awaiting_review' as const, updatedAt: '2026-07-12T09:00:00.000Z', lastRunId: 'seed-run' },
+      },
+    };
+    writeState(config.scratchDir, seededState);
+    const app = createApp(config, { runDelayMs: 5 });
+
+    const res = await request(app).post('/api/stages/03_report/run');
+    expect(res.status).toBe(422);
+    expect(res.body.blockingStage).toBe('03_report');
+    expect(res.body.blockingStatus).toBe('awaiting_review');
+
+    const pipeline = await request(app).get('/api/pipeline');
+    const stage = pipeline.body.stages.find((s: { name: string }) => s.name === '03_report');
+    expect(stage.status).toBe('awaiting_review');
+    expect(stage.running).toBe(false);
+  });
+
   it('POST approve moves an awaiting_review stage to approved', async () => {
     writeState(config.scratchDir, {
       stages: {
