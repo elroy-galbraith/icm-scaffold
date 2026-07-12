@@ -5,7 +5,7 @@ import type { RunStatus, ToolCallLogEntry } from './runLog.js';
 
 export const DEFAULT_MODEL = 'anthropic/claude-sonnet-5';
 export const DEFAULT_TOKEN_BUDGET = 200_000;
-export const DEFAULT_MAX_TOKENS = 4096;
+export const DEFAULT_MAX_TOKENS = 8192;
 const MAX_TOOL_ERROR_RETRIES = 3;
 const MAX_ITERATIONS = 50;
 
@@ -73,7 +73,50 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentLoopRe
       }
 
       for (const call of toolCalls) {
-        const args = JSON.parse(call.function.arguments) as Record<string, unknown>;
+        let args: Record<string, unknown>;
+        try {
+          args = JSON.parse(call.function.arguments) as Record<string, unknown>;
+        } catch (err) {
+          // The model's tool-call arguments can be truncated mid-generation if the
+          // response hits maxTokens before finishing (most commonly on large
+          // write_file calls). Treat that exactly like a failed tool execution
+          // (executeTool's `{ ok: false, content }` shape) instead of letting the
+          // SyntaxError propagate to the outer try/catch and abort the whole run.
+          const parseErrorMessage = err instanceof Error ? err.message : String(err);
+          const content = `Invalid tool call arguments (possibly truncated): ${parseErrorMessage}. If you intended a large write_file call, try writing shorter content or splitting it across multiple calls.`;
+
+          messages.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            name: call.function.name,
+            content,
+          });
+
+          // Record it in the run log for debuggability, mirroring executeTool's own
+          // (unchecked) cast of the tool name into ToolCallLogEntry['tool']. There are
+          // no valid parsed args, so the raw (truncated) argument string is logged instead.
+          ctx.toolCalls.push({
+            tool: call.function.name as ToolCallLogEntry['tool'],
+            args: { rawArguments: call.function.arguments },
+            result: 'error',
+            errorMessage: content,
+            timestamp: new Date().toISOString(),
+          });
+
+          toolErrorStreak++;
+          if (toolErrorStreak > MAX_TOOL_ERROR_RETRIES) {
+            return finish(
+              'error',
+              ctx,
+              budget,
+              model,
+              tokenBudgetLimit,
+              `Too many consecutive tool errors; last error: ${content}`
+            );
+          }
+          continue;
+        }
+
         const result = executeTool(call.function.name, args, ctx);
         messages.push({
           role: 'tool',

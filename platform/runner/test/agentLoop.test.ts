@@ -9,7 +9,7 @@ import type { ChatCompletionFn, ChatCompletionParams, ChatCompletionResult } fro
 const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/workspace', import.meta.url));
 
 interface ScriptStep {
-  toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
+  toolCalls?: Array<{ name: string; args?: Record<string, unknown>; rawArguments?: string }>;
   totalTokens: number;
 }
 
@@ -27,7 +27,7 @@ function scriptedChat(script: ScriptStep[], onCall?: (params: ChatCompletionPara
         tool_calls: step.toolCalls?.map((tc, i) => ({
           id: `call-${call}-${i}`,
           type: 'function' as const,
-          function: { name: tc.name, arguments: JSON.stringify(tc.args) },
+          function: { name: tc.name, arguments: tc.rawArguments ?? JSON.stringify(tc.args ?? {}) },
         })),
       },
       totalTokens: step.totalTokens,
@@ -157,5 +157,74 @@ describe('runAgentLoop', () => {
 
     expect(result.status).toBe('aborted_budget');
     expect(result.tokensSpent).toBe(200);
+  });
+
+  it('recovers from a truncated/invalid write_file tool-call JSON instead of aborting the run', async () => {
+    const chat = scriptedChat([
+      {
+        toolCalls: [
+          {
+            name: 'write_file',
+            rawArguments: '{"path": "output/findings.md", "content": "some unterminated',
+          },
+        ],
+        totalTokens: 80,
+      },
+      {
+        toolCalls: [
+          {
+            name: 'write_file',
+            args: { path: 'stages/01_research/output/findings.md', content: '# Findings\n' },
+          },
+        ],
+        totalTokens: 80,
+      },
+      {
+        toolCalls: [
+          { name: 'finish_stage', args: { gateSummary: 'Findings written. Verify: has at least one finding.' } },
+        ],
+        totalTokens: 30,
+      },
+    ]);
+
+    const result = await runAgentLoop({
+      workspaceRoot,
+      stage: '01_research',
+      apiKey: 'test-key',
+      chatCompletionFn: chat,
+    });
+
+    expect(result.status).not.toBe('error');
+    expect(result.status).toBe('completed');
+    expect(result.filesWritten).toContain('stages/01_research/output/findings.md');
+    expect(
+      result.toolCalls.some(
+        (tc) => tc.result === 'error' && tc.errorMessage?.includes('possibly truncated')
+      )
+    ).toBe(true);
+  });
+
+  it('aborts with status error when truncated tool-call JSON repeats past the retry limit', async () => {
+    // MAX_TOOL_ERROR_RETRIES is 3 (not exported); one more failure than that must abort.
+    const truncatedStep = {
+      toolCalls: [
+        {
+          name: 'write_file',
+          rawArguments: '{"path": "output/findings.md", "content": "some unterminated',
+        },
+      ],
+      totalTokens: 20,
+    };
+    const chat = scriptedChat([truncatedStep, truncatedStep, truncatedStep, truncatedStep]);
+
+    const result = await runAgentLoop({
+      workspaceRoot,
+      stage: '01_research',
+      apiKey: 'test-key',
+      chatCompletionFn: chat,
+    });
+
+    expect(result.status).toBe('error');
+    expect(result.errorMessage).toContain('Too many consecutive tool errors');
   });
 });
