@@ -1,0 +1,8 @@
+{
+  "id": "meridian-smoke",
+  "purpose": "Pipeline smoke test — mechanics only, excluded from scoring (eval-design.md 3.1)",
+  "brief": "brief.md",
+  "stage_token_budget": 200000,
+  "allowed_domains": ["wikipedia.org", "zendesk.com", "intercom.com", "gartner.com", "mckinsey.com"],
+  "model": "anthropic/claude-sonnet-5"
+}
