@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "icm/runner-config-proposal",
+  "title": "RunnerConfig (proposed)",
+  "description": "Contents of <workspace>/runner.config.json. Committed to the workspace as part of the reproducibility story (docs/mvp-spec.md §5). PROPOSED — not yet a frozen contract; mirrors platform/runner/src/config.ts. See contracts/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "model": {
+      "type": "string",
+      "enum": ["anthropic/claude-sonnet-5", "anthropic/claude-opus-4.8", "openai/gpt-5.2"],
+      "description": "Vetted OpenRouter model slug. Defaults to anthropic/claude-sonnet-5 if omitted."
+    },
+    "tokenBudget": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "description": "Per-run token budget cap. Defaults to 200000 if omitted."
+    },
+    "allowedDomains": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Outbound fetch_url domain allowlist. Defaults to [] (all fetches refused) if omitted."
+    }
+  }
+}
