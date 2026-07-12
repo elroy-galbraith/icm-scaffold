@@ -64,4 +64,35 @@ describe('git', () => {
       expect(path === '.runner.lock' || path.startsWith('.runner/')).toBe(true);
     }
   });
+
+  it('is a no-op when only .runner.lock and .runner/ contents are freshly created', () => {
+    const before = currentHead(workspaceRoot);
+    writeFileSync(join(workspaceRoot, '.runner.lock'), 'pid: 1234');
+    mkdirSync(join(workspaceRoot, '.runner'), { recursive: true });
+    writeFileSync(join(workspaceRoot, '.runner', 'state.json'), '{"stage":"01_research"}');
+
+    const after = commitWorkspace(workspaceRoot, 'nothing to commit');
+
+    expect(after).toBe(before);
+    expect(currentHead(workspaceRoot)).toBe(before);
+  });
+
+  it('unstages .runner.lock left staged in the index by a prior interrupted commitWorkspace call', () => {
+    const before = currentHead(workspaceRoot);
+    // Simulate a prior failed/interrupted commitWorkspace that staged .runner.lock
+    // before this fix existed, leaving it staged in the index without a commit.
+    writeFileSync(join(workspaceRoot, '.runner.lock'), 'pid: 999');
+    execFileSync('git', ['add', '.runner.lock'], { cwd: workspaceRoot });
+
+    const after = commitWorkspace(workspaceRoot, 'stage run');
+
+    // Nothing else changed in the workspace, so once .runner.lock is unstaged there is
+    // genuinely nothing to commit.
+    expect(after).toBe(before);
+    expect(currentHead(workspaceRoot)).toBe(before);
+
+    const status = execFileSync('git', ['status', '--porcelain'], { cwd: workspaceRoot }).toString();
+    const statusLines = status.split('\n').filter((line) => line.trim().length > 0);
+    expect(statusLines).toEqual(['?? .runner.lock']);
+  });
 });
