@@ -45,12 +45,55 @@ describe('buildPipelineView', () => {
     expect(view.stages.every((s) => s.running === false)).toBe(true);
   });
 
-  it('orders stages by numeric prefix and defaults an absent stage to pending', () => {
+  it('orders stages by numeric prefix', () => {
     const view = buildPipelineView(workspaceRoot);
     expect(view.stages.map((s) => s.name)).toEqual(['01_research', '02_analysis']);
     expect(view.stages[0].status).toBe('approved');
     expect(view.stages[1].status).toBe('rejected');
     expect(view.stages[1].comment).toBe('needs more depth');
+  });
+
+  it('defaults a stage absent from state.json to pending', () => {
+    mkdirSync(join(workspaceRoot, 'stages', '03_report', 'output'), { recursive: true });
+
+    const view = buildPipelineView(workspaceRoot);
+    const stage = view.stages.find((s) => s.name === '03_report');
+
+    expect(stage).toBeDefined();
+    expect(stage?.status).toBe('pending');
+    expect(stage?.running).toBe(false);
+    expect(stage?.lastRun ?? null).toBeNull();
+  });
+
+  it('surfaces a failed run via lastRun even though the stage reverted to pending (failure-join rule)', () => {
+    writeState(workspaceRoot, {
+      stages: {
+        '01_research': { status: 'approved', updatedAt: '2026-07-12T09:00:00.000Z', lastRunId: 'run-1' },
+        '02_analysis': { status: 'pending', updatedAt: '2026-07-12T09:20:00.000Z', lastRunId: 'run-3' },
+      },
+    });
+    writeRunLog(workspaceRoot, {
+      runId: 'run-3',
+      stage: '02_analysis',
+      model: 'anthropic/claude-sonnet-5',
+      startedAt: '2026-07-12T09:15:00.000Z',
+      endedAt: '2026-07-12T09:19:00.000Z',
+      status: 'error',
+      filesRead: [],
+      filesWritten: [],
+      toolCalls: [],
+      tokensSpent: 4200,
+      tokenBudget: 200000,
+      errorMessage: 'Model returned malformed tool call; aborting after 3 retries.',
+    });
+
+    const view = buildPipelineView(workspaceRoot);
+    const stage = view.stages.find((s) => s.name === '02_analysis');
+
+    expect(stage?.status).toBe('pending');
+    expect(stage?.running).toBe(false);
+    expect(stage?.lastRun?.status).toBe('error');
+    expect(stage?.lastRun?.errorMessage).toBe('Model returned malformed tool call; aborting after 3 retries.');
   });
 
   it('joins lastRun from the run log referenced by lastRunId', () => {
