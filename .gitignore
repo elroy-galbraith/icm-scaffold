@@ -1,0 +1,6 @@
+# Per-run artifacts — commit them per engagement if you want the audit trail,
+# or keep them out of the template repo. Default: ignored in the template.
+stages/*/output/*
+!stages/*/output/.gitkeep
+
+.DS_Store
