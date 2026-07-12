@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { WorkspaceConfig } from '../workspace.js';
+import { STAGE_NAME_PATTERN, type WorkspaceConfig } from '../workspace.js';
 import { beginStageRun, completeStageRun, StageBlockedError, StageLockedError } from '../simulate.js';
 import { readState, updateStageState, type StageStatus } from '../state.js';
 import { commitWorkspace } from '../git.js';
@@ -11,6 +11,16 @@ function getStageStatus(config: WorkspaceConfig, stage: string): StageStatus {
 
 export function createStageActionsRouter(config: WorkspaceConfig, options: { runDelayMs?: number } = {}): Router {
   const router = Router();
+
+  // Reject any :stage that doesn't match the contract's stage-name pattern before it can
+  // reach a filesystem operation (completeStageRun's cpSync) or a state.json object key.
+  router.param('stage', (req, res, next, stage) => {
+    if (!STAGE_NAME_PATTERN.test(stage)) {
+      res.status(400).json({ error: 'Invalid stage name' });
+      return;
+    }
+    next();
+  });
 
   router.post('/api/stages/:stage/run', (req, res) => {
     const { stage } = req.params;

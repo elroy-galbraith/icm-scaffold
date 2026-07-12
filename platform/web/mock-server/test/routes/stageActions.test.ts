@@ -147,4 +147,19 @@ describe('stage action routes', () => {
     const second = await request(app).post('/api/stages/02_analysis/reject').send({ comment: 'again' });
     expect(second.status).toBe(409);
   });
+
+  it('rejects a :stage that does not match the stage-name pattern, for run/approve/reject alike', async () => {
+    const app = createApp(config, { runDelayMs: 5 });
+
+    // Encoded slash traversal: without a route-param validator this would reach
+    // completeStageRun's cpSync with a stage value that resolves outside stages/.
+    const runRes = await request(app).post('/api/stages/..%2F..%2Fetc/run');
+    expect(runRes.status).toBe(400);
+
+    const approveRes = await request(app).post('/api/stages/not-a-stage/approve');
+    expect(approveRes.status).toBe(400);
+
+    const rejectRes = await request(app).post('/api/stages/not-a-stage/reject').send({ comment: 'x' });
+    expect(rejectRes.status).toBe(400);
+  });
 });

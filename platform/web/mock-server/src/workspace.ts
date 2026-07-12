@@ -16,7 +16,7 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   pendingStage: '03_report',
 };
 
-const STAGE_NAME_PATTERN = /^[0-9]{2}_[a-z0-9_]+$/;
+export const STAGE_NAME_PATTERN = /^[0-9]{2}_[a-z0-9_]+$/;
 
 export function listStageNames(scratchDir: string): string[] {
   const stagesDir = join(scratchDir, 'stages');
