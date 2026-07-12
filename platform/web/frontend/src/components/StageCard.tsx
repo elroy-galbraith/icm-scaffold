@@ -45,6 +45,9 @@ export function StageCard({
   const runTitle = blockedBy
     ? `Blocked: ${blockedBy.stage} is ${blockedBy.status}, must be approved first.`
     : undefined;
+  // GateActions exposes a single `disabled` flag covering both Approve and Reject (they're
+  // mutually exclusive actions on the same gate), so fold the two independently-tracked
+  // pending flags into it here rather than narrowing GateActions's contract.
   const gateDisabled = workspaceLocked || isApprovePending || isRejectPending;
 
   return (

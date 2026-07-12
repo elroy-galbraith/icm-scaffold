@@ -99,6 +99,11 @@ export function PipelineView() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['pipeline'] });
 
+  // Toasts are a list, not a single slot: multiple mutations (e.g. a Run 409 on one stage and
+  // an Approve 422 on another) can fail around the same time, and each failure names a specific
+  // stage/reason the user needs to see. A single "current error" slot would silently drop an
+  // earlier still-relevant error the moment a second one lands. Each toast gets its own id so
+  // it can be dismissed independently of the others.
   const [toasts, setToasts] = useState<Array<{ id: number; message: string }>>([]);
   const nextToastId = useRef(0);
   const pushToast = (message: string) => {
@@ -107,6 +112,11 @@ export function PipelineView() {
   };
   const dismissToast = (id: number) => setToasts((t) => t.filter((toast) => toast.id !== id));
 
+  // Each mutation below is a single shared object reused across every StageCard, so
+  // `mutation.variables`/`mutation.isPending` only ever reflects the single most recent
+  // `.mutate()` call — it cannot represent "stage A is still in flight while stage B was
+  // just kicked off too". We track the actual set of in-flight stage names explicitly so
+  // N stages can have independent pending state simultaneously.
   const [pendingRuns, setPendingRuns] = useState<Set<string>>(new Set());
   const [pendingApprovals, setPendingApprovals] = useState<Set<string>>(new Set());
   const [pendingRejections, setPendingRejections] = useState<Set<string>>(new Set());
@@ -140,6 +150,15 @@ export function PipelineView() {
   });
   const saveFileMutation = useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) => putFile(path, content),
+    // `saveFileMutation` is a single shared mutation object (mirroring the run/approve/reject
+    // mutations above), so a save for file A can still be in flight after the user has already
+    // navigated to file B and started editing it (selectedPath/editing describe B by then).
+    // Only collapse the editor back to the viewer if the file we just saved is still the one
+    // selected — otherwise this would unmount B's MarkdownEditor and silently discard whatever
+    // the user had typed into it. We deliberately don't also disable file-tree navigation or the
+    // edit toggle while a save is pending: browsing to and editing an unrelated file during a
+    // save is legitimate, and this variables.path === selectedPath check alone is sufficient to
+    // keep the single "currently edited file" slot consistent.
     onSuccess: (_data, variables) => {
       if (variables.path === selectedPath) {
         setEditing(false);
