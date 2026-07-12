@@ -3,13 +3,14 @@ import { join } from 'node:path';
 
 export interface LockInfo {
   runId: string;
+  stage: string;
   pid: number;
   acquiredAt: string;
 }
 
 export class LockHeldError extends Error {
   constructor(public readonly holder: LockInfo) {
-    super(`Workspace is locked by run ${holder.runId} (pid ${holder.pid}) since ${holder.acquiredAt}`);
+    super(`Workspace is locked by stage ${holder.stage} run ${holder.runId} (pid ${holder.pid}) since ${holder.acquiredAt}`);
     this.name = 'LockHeldError';
   }
 }
@@ -18,13 +19,13 @@ function lockPath(workspaceRoot: string): string {
   return join(workspaceRoot, '.runner.lock');
 }
 
-export function acquireLock(workspaceRoot: string, runId: string): void {
+export function acquireLock(workspaceRoot: string, runId: string, stage: string): void {
   const path = lockPath(workspaceRoot);
   if (existsSync(path)) {
     const holder = JSON.parse(readFileSync(path, 'utf-8')) as LockInfo;
     throw new LockHeldError(holder);
   }
-  const info: LockInfo = { runId, pid: process.pid, acquiredAt: new Date().toISOString() };
+  const info: LockInfo = { runId, stage, pid: process.pid, acquiredAt: new Date().toISOString() };
   mkdirSync(workspaceRoot, { recursive: true });
   writeFileSync(path, JSON.stringify(info, null, 2));
 }
