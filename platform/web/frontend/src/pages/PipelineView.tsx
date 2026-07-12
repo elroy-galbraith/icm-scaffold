@@ -1,7 +1,18 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getPipeline, runStage, approveStage, rejectStage, type StageStatus } from '../api/client.js';
+import {
+  getPipeline,
+  runStage,
+  approveStage,
+  rejectStage,
+  getTree,
+  getFile,
+  putFile,
+  type StageStatus,
+} from '../api/client.js';
 import { StageCard } from '../components/StageCard.js';
+import { MarkdownViewer } from '../components/MarkdownViewer.js';
+import { MarkdownEditor } from '../components/MarkdownEditor.js';
 
 function addTo(set: Set<string>, name: string): Set<string> {
   const next = new Set(set);
@@ -32,10 +43,20 @@ function computeBlockedBy(
 
 export function PipelineView() {
   const queryClient = useQueryClient();
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['pipeline'],
     queryFn: getPipeline,
     refetchInterval: POLL_INTERVAL_MS,
+  });
+
+  const treeQuery = useQuery({ queryKey: ['tree'], queryFn: getTree, refetchInterval: POLL_INTERVAL_MS });
+  const fileQuery = useQuery({
+    queryKey: ['file', selectedPath],
+    queryFn: () => getFile(selectedPath as string),
+    enabled: selectedPath !== null,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['pipeline'] });
@@ -68,6 +89,14 @@ export function PipelineView() {
     onError: () => invalidate(),
     onSettled: (_data, _error, variables) => setPendingRejections((prev) => removeFrom(prev, variables.stage)),
   });
+  const saveFileMutation = useMutation({
+    mutationFn: ({ path, content }: { path: string; content: string }) => putFile(path, content),
+    onSuccess: (_data, variables) => {
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ['file', variables.path] });
+      queryClient.invalidateQueries({ queryKey: ['tree'] });
+    },
+  });
 
   const handleRun = (stage: string) => {
     setPendingRuns((prev) => addTo(prev, stage));
@@ -88,6 +117,8 @@ export function PipelineView() {
   if (isError || !data) {
     return <p data-testid="pipeline-error">Failed to load the pipeline.</p>;
   }
+
+  const files = (treeQuery.data ?? []).filter((entry) => entry.type === 'file');
 
   return (
     <main>
@@ -111,6 +142,45 @@ export function PipelineView() {
           />
         ))}
       </div>
+
+      <aside>
+        <h2>Files</h2>
+        <ul data-testid="file-tree">
+          {files.map((entry) => (
+            <li key={entry.path}>
+              <button
+                type="button"
+                data-testid={`file-tree-entry-${entry.path}`}
+                onClick={() => {
+                  setSelectedPath(entry.path);
+                  setEditing(false);
+                }}
+              >
+                {entry.path}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </aside>
+
+      {selectedPath && fileQuery.data && (
+        <section>
+          <h2>{selectedPath}</h2>
+          <button type="button" data-testid="file-edit-toggle" onClick={() => setEditing((e) => !e)}>
+            {editing ? 'View' : 'Edit'}
+          </button>
+          {editing ? (
+            <MarkdownEditor
+              path={selectedPath}
+              initialContent={fileQuery.data.content}
+              saving={saveFileMutation.isPending}
+              onSave={(content) => saveFileMutation.mutate({ path: selectedPath, content })}
+            />
+          ) : (
+            <MarkdownViewer content={fileQuery.data.content} />
+          )}
+        </section>
+      )}
     </main>
   );
 }
