@@ -25,7 +25,10 @@
         "required": ["tool", "args", "result", "timestamp"],
         "additionalProperties": false,
         "properties": {
-          "tool": { "enum": ["read_file", "write_file", "list_dir", "finish_stage"] },
+          "tool": {
+            "enum": ["read_file", "write_file", "list_dir", "finish_stage", "fetch_url", "run_script"],
+            "description": "Closed enum by design — adding a tool is a deliberate contract change requiring human approval. fetch_url/run_script approved 2026-07-12 (model-gateway integration)."
+          },
           "args": { "type": "object" },
           "result": { "enum": ["ok", "error"] },
           "errorMessage": { "type": "string" },

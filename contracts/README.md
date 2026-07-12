@@ -14,6 +14,7 @@ Reference this folder from every worktree's CLAUDE.md:
 | `schemas/workspace-state.schema.json` | `.runner/state.json` | runner (writes), web (reads) |
 | `schemas/run-log.schema.json` | `.runner/runs/<runId>.json` | runner (writes), web (reads) |
 | `schemas/lock.schema.json` | `.runner.lock` | runner (writes), web (reads) |
+| `schemas/runner-config.schema.json` | `<workspace>/runner.config.json` | runner (reads), web (reads), humans (write) |
 | `openapi.yaml` | HTTP surface of the web backend | web backend (implements), web UI (mocks against) |
 
 ## Integration decision (pinned)
