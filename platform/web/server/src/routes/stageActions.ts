@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { STAGE_NAME_PATTERN, checkStageOrder, type WorkspaceConfig } from '../workspace.js';
 import { readState, readLock, type StageStatus } from '../state.js';
 import { defaultRunnerCli, type RunnerCli } from '../runnerCli.js';
+import { commitWorkspace } from '../git.js';
 
 function getStageStatus(config: WorkspaceConfig, stage: string): StageStatus {
   const state = readState(config.workspaceRoot);
@@ -57,6 +58,11 @@ export function createStageActionsRouter(
     }
     try {
       await runnerCli.approveStage(config.workspaceRoot, stage);
+      // The runner CLI's own commit runs before it updates .runner/state.json, so it
+      // commits nothing; compensate here so the approval actually lands in the audit
+      // trail (contracts/openapi.yaml: 200 means "state committed"). This is a no-op
+      // if the CLI ever fixes its ordering and commits the change itself.
+      commitWorkspace(config.workspaceRoot, `stage ${stage}: approved`);
       res.status(200).json({});
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -77,6 +83,11 @@ export function createStageActionsRouter(
     }
     try {
       await runnerCli.rejectStage(config.workspaceRoot, stage, comment);
+      // The runner CLI's own reject command never commits at all; compensate here so
+      // the rejection actually lands in the audit trail (contracts/openapi.yaml: 200
+      // means "comment stored"). This is a no-op if the CLI ever starts committing
+      // the change itself.
+      commitWorkspace(config.workspaceRoot, `stage ${stage}: rejected — ${comment}`);
       res.status(200).json({});
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

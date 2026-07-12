@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import express from 'express';
 import request from 'supertest';
 import { createStageActionsRouter } from '../../src/routes/stageActions.js';
 import { seedTestWorkspace } from '../helpers/seedTestWorkspace.js';
-import { writeState, writeLock } from '../../src/state.js';
+import { writeState, writeLock, updateStageState } from '../../src/state.js';
 import type { WorkspaceConfig } from '../../src/workspace.js';
 import type { RunnerCli } from '../../src/runnerCli.js';
 
@@ -172,5 +173,60 @@ describe('stage action routes', () => {
     const res = await request(app).post('/api/stages/02_analysis/approve');
     expect(res.status).toBe(500);
     expect(res.body.error).toContain('git commit failed');
+  });
+
+  it('POST approve commits the workspace after the CLI updates state, so the transition lands in the audit trail', async () => {
+    writeState(config.workspaceRoot, {
+      stages: {
+        '01_research': { status: 'approved', updatedAt: '2026-07-12T09:00:00.000Z' },
+        '02_analysis': { status: 'awaiting_review', updatedAt: '2026-07-12T09:00:00.000Z' },
+      },
+    });
+    // Simulates what the real runner CLI's approve command does to the workspace:
+    // it mutates .runner/state.json but (per the bug being fixed) does not itself
+    // reliably commit that change.
+    const runnerCli: RunnerCli = {
+      runStageInBackground: vi.fn(),
+      approveStage: vi.fn(async (workspaceRoot, stage) => {
+        updateStageState(workspaceRoot, stage, { status: 'approved', comment: undefined });
+      }),
+      rejectStage: vi.fn(),
+    };
+    const app = buildApp(config, runnerCli);
+
+    const res = await request(app).post('/api/stages/02_analysis/approve');
+
+    expect(res.status).toBe(200);
+    const subject = execFileSync('git', ['log', '-1', '--pretty=%s'], { cwd: config.workspaceRoot }).toString().trim();
+    expect(subject).toBe('stage 02_analysis: approved');
+    const status = execFileSync('git', ['status', '--short'], { cwd: config.workspaceRoot }).toString();
+    expect(status).toBe('');
+  });
+
+  it('POST reject commits the workspace after the CLI updates state, so the transition lands in the audit trail', async () => {
+    writeState(config.workspaceRoot, {
+      stages: {
+        '01_research': { status: 'approved', updatedAt: '2026-07-12T09:00:00.000Z' },
+        '02_analysis': { status: 'awaiting_review', updatedAt: '2026-07-12T09:00:00.000Z' },
+      },
+    });
+    // Simulates what the real runner CLI's reject command does to the workspace:
+    // it mutates .runner/state.json but (per the bug being fixed) never commits at all.
+    const runnerCli: RunnerCli = {
+      runStageInBackground: vi.fn(),
+      approveStage: vi.fn(),
+      rejectStage: vi.fn(async (workspaceRoot, stage, comment) => {
+        updateStageState(workspaceRoot, stage, { status: 'rejected', comment });
+      }),
+    };
+    const app = buildApp(config, runnerCli);
+
+    const res = await request(app).post('/api/stages/02_analysis/reject').send({ comment: 'too shallow' });
+
+    expect(res.status).toBe(200);
+    const subject = execFileSync('git', ['log', '-1', '--pretty=%s'], { cwd: config.workspaceRoot }).toString().trim();
+    expect(subject).toBe('stage 02_analysis: rejected — too shallow');
+    const status = execFileSync('git', ['status', '--short'], { cwd: config.workspaceRoot }).toString();
+    expect(status).toBe('');
   });
 });
