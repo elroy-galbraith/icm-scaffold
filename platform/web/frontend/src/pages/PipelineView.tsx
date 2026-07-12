@@ -91,8 +91,19 @@ export function PipelineView() {
   });
   const saveFileMutation = useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) => putFile(path, content),
+    // `saveFileMutation` is a single shared mutation object (mirroring the run/approve/reject
+    // mutations above), so a save for file A can still be in flight after the user has already
+    // navigated to file B and started editing it (selectedPath/editing describe B by then).
+    // Only collapse the editor back to the viewer if the file we just saved is still the one
+    // selected — otherwise this would unmount B's MarkdownEditor and silently discard whatever
+    // the user had typed into it. We deliberately don't also disable file-tree navigation or the
+    // edit toggle while a save is pending: browsing to and editing an unrelated file during a
+    // save is legitimate, and this variables.path === selectedPath check alone is sufficient to
+    // keep the single "currently edited file" slot consistent.
     onSuccess: (_data, variables) => {
-      setEditing(false);
+      if (variables.path === selectedPath) {
+        setEditing(false);
+      }
       queryClient.invalidateQueries({ queryKey: ['file', variables.path] });
       queryClient.invalidateQueries({ queryKey: ['tree'] });
     },

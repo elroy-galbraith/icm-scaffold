@@ -183,4 +183,51 @@ describe('PipelineView', () => {
 
     await waitFor(() => expect(putFile).toHaveBeenCalledWith('shared/client-brief.md', 'Edited brief.'));
   });
+
+  it('does not discard an in-progress edit on a different file when an earlier save resolves', async () => {
+    // Regression test for: saveFileMutation is a single shared mutation object, so its
+    // onSuccess used to call setEditing(false) unconditionally. If file A's save was still in
+    // flight when the user switched to file B and started editing it, A's save resolving would
+    // blow away B's editor (and B's unsaved content) even though A and B are unrelated.
+    const saveA = deferred<void>();
+    vi.mocked(putFile).mockImplementation((path: string) => {
+      if (path === 'a.md') return saveA.promise;
+      return Promise.resolve(undefined);
+    });
+    vi.mocked(getPipeline).mockResolvedValue(BASE_PIPELINE);
+    vi.mocked(getTree).mockResolvedValue([
+      { path: 'a.md', type: 'file' },
+      { path: 'b.md', type: 'file' },
+    ]);
+    vi.mocked(getFile).mockImplementation((path: string) =>
+      Promise.resolve({ path, content: path === 'a.md' ? 'Content A.' : 'Content B.' })
+    );
+    renderWithClient(<PipelineView />);
+
+    // Select file A, enter edit mode, edit it, and kick off a save that stays in flight.
+    await waitFor(() => expect(screen.getByTestId('file-tree-entry-a.md')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('file-tree-entry-a.md'));
+    await waitFor(() => expect(screen.getByTestId('markdown-viewer')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('file-edit-toggle'));
+    fireEvent.change(screen.getByTestId('markdown-editor-textarea'), { target: { value: 'Edited A.' } });
+    fireEvent.click(screen.getByTestId('markdown-editor-save'));
+    await waitFor(() => expect(putFile).toHaveBeenCalledWith('a.md', 'Edited A.'));
+
+    // While A's save is still unresolved, switch to file B and start editing it.
+    fireEvent.click(screen.getByTestId('file-tree-entry-b.md'));
+    await waitFor(() => expect(screen.getByTestId('markdown-viewer')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('file-edit-toggle'));
+    fireEvent.change(screen.getByTestId('markdown-editor-textarea'), { target: { value: 'Unsaved B edit.' } });
+    expect(screen.getByTestId('markdown-editor')).toBeInTheDocument();
+
+    // Now resolve A's save. Its onSuccess must not clobber B's still-open, still-dirty editor.
+    await act(async () => {
+      saveA.resolve();
+      await saveA.promise;
+    });
+
+    expect(screen.getByTestId('markdown-editor')).toBeInTheDocument();
+    expect(screen.getByTestId('markdown-editor-textarea')).toHaveValue('Unsaved B edit.');
+    expect(screen.queryByTestId('markdown-viewer')).not.toBeInTheDocument();
+  });
 });
