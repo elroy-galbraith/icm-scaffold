@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, existsSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,6 +66,46 @@ describe('GET/PUT /api/files', () => {
     const app = createApp(config);
     const res = await request(app).put('/api/files').query({ path: '.runner/state.json' }).send({ content: '{}' });
     expect(res.status).toBe(403);
+  });
+
+  it('PUT returns 403 for a .runner/ path spelled with a leading "./"', async () => {
+    const app = createApp(config);
+    const res = await request(app)
+      .put('/api/files')
+      .query({ path: './.runner/evil.json' })
+      .send({ content: '{}' });
+    expect(res.status).toBe(403);
+    expect(existsSync(join(config.scratchDir, '.runner/evil.json'))).toBe(false);
+  });
+
+  it('PUT returns 403 for a .runner/ path spelled via a "../" normalization trick', async () => {
+    const app = createApp(config);
+    const res = await request(app)
+      .put('/api/files')
+      .query({ path: 'shared/../.runner/evil.json' })
+      .send({ content: '{}' });
+    expect(res.status).toBe(403);
+    expect(existsSync(join(config.scratchDir, '.runner/evil.json'))).toBe(false);
+  });
+
+  it('GET/PUT return 403 for a path that escapes the workspace through a symlink', async () => {
+    const outsideDir = mkdtempSync(join(tmpdir(), 'route-files-outside-'));
+    try {
+      const app = createApp(config);
+      symlinkSync(outsideDir, join(config.scratchDir, 'escape'));
+
+      const getRes = await request(app).get('/api/files').query({ path: 'escape/secret.txt' });
+      expect(getRes.status).toBe(403);
+
+      const putRes = await request(app)
+        .put('/api/files')
+        .query({ path: 'escape/evil.json' })
+        .send({ content: '{}' });
+      expect(putRes.status).toBe(403);
+      expect(existsSync(join(outsideDir, 'evil.json'))).toBe(false);
+    } finally {
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
   });
 
   it('PUT returns 409 when the workspace is locked', async () => {
