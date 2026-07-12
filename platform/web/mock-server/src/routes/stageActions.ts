@@ -1,0 +1,67 @@
+import { Router } from 'express';
+import type { WorkspaceConfig } from '../workspace.js';
+import { beginStageRun, completeStageRun, StageBlockedError, StageLockedError } from '../simulate.js';
+import { readState, updateStageState } from '../state.js';
+import { commitWorkspace } from '../git.js';
+
+export function createStageActionsRouter(config: WorkspaceConfig, options: { runDelayMs?: number } = {}): Router {
+  const router = Router();
+
+  router.post('/api/stages/:stage/run', (req, res) => {
+    const { stage } = req.params;
+    try {
+      const { runId } = beginStageRun(config.scratchDir, stage);
+      void completeStageRun({
+        workspaceRoot: config.scratchDir,
+        fixtureDir: config.fixtureDir,
+        stage,
+        runId,
+        delayMs: options.runDelayMs,
+      });
+      res.status(202).end();
+    } catch (err) {
+      if (err instanceof StageBlockedError) {
+        res.status(422).json({ blockingStage: err.blockingStage, blockingStatus: err.blockingStatus });
+        return;
+      }
+      if (err instanceof StageLockedError) {
+        res.status(409).json({ runId: err.lock.runId, stage: err.lock.stage, acquiredAt: err.lock.acquiredAt });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  router.post('/api/stages/:stage/approve', (req, res) => {
+    const { stage } = req.params;
+    const state = readState(config.scratchDir);
+    const currentStatus = state.stages[stage]?.status ?? 'pending';
+    if (currentStatus !== 'awaiting_review') {
+      res.status(409).json({ stage, status: currentStatus });
+      return;
+    }
+    updateStageState(config.scratchDir, stage, { status: 'approved' });
+    commitWorkspace(config.scratchDir, `Approve ${stage}`);
+    res.status(200).json({});
+  });
+
+  router.post('/api/stages/:stage/reject', (req, res) => {
+    const { stage } = req.params;
+    const comment = typeof req.body?.comment === 'string' ? req.body.comment : '';
+    if (comment.length < 1) {
+      res.status(422).json({ error: 'comment is required' });
+      return;
+    }
+    const state = readState(config.scratchDir);
+    const currentStatus = state.stages[stage]?.status ?? 'pending';
+    if (currentStatus !== 'awaiting_review') {
+      res.status(409).json({ stage, status: currentStatus });
+      return;
+    }
+    updateStageState(config.scratchDir, stage, { status: 'rejected', comment });
+    commitWorkspace(config.scratchDir, `Reject ${stage}: ${comment}`);
+    res.status(200).json({});
+  });
+
+  return router;
+}
