@@ -13,6 +13,8 @@ platform/runner/.env
 
 platform/web/mock-server/node_modules/
 platform/web/mock-server/dist/
+platform/web/server/node_modules/
+platform/web/server/dist/
 platform/web/frontend/node_modules/
 platform/web/frontend/dist/
 platform/web/frontend/playwright-report/
