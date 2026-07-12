@@ -127,4 +127,18 @@ describe('CLI commands', () => {
   it('statusCommand runs without throwing when no runs exist yet', () => {
     expect(() => statusCommand(workspaceRoot)).not.toThrow();
   });
+
+  it('clears a stale rejection comment once the stage is successfully re-run', async () => {
+    rejectCommand(workspaceRoot, '01_research', 'too shallow');
+    expect(readState(workspaceRoot).stages['01_research'].comment).toBe('too shallow');
+
+    const chat = scriptedChat([
+      { toolCalls: [{ name: 'finish_stage', args: { gateSummary: 'Done. Verify: ok.' } }], totalTokens: 10 },
+    ]);
+    await runCommand(workspaceRoot, '01_research', { chatCompletionFn: chat });
+
+    const state = readState(workspaceRoot);
+    expect(state.stages['01_research'].status).toBe('awaiting_review');
+    expect(state.stages['01_research'].comment).toBeUndefined();
+  });
 });

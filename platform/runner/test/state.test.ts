@@ -39,4 +39,11 @@ describe('state', () => {
     const state = readState(workspaceRoot);
     expect(state.stages['01_research'].comment).toBe('too shallow');
   });
+
+  it('clears the comment when the patch explicitly sets it to undefined', () => {
+    updateStageState(workspaceRoot, '01_research', { status: 'rejected', comment: 'x' });
+    updateStageState(workspaceRoot, '01_research', { status: 'awaiting_review', comment: undefined });
+    const state = readState(workspaceRoot);
+    expect(state.stages['01_research'].comment).toBeUndefined();
+  });
 });

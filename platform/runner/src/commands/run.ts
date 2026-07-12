@@ -66,6 +66,7 @@ export async function runCommand(workspaceRoot: string, stage: string, deps: Run
     updateStageState(workspaceRoot, stage, {
       status: result.status === 'completed' ? 'awaiting_review' : 'pending',
       lastRunId: runId,
+      comment: undefined,
     });
 
     console.log(`Run ${runId} (${stage}): ${result.status}`);

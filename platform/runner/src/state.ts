@@ -41,8 +41,8 @@ export function updateStageState(
   const existing = state.stages[stage];
   state.stages[stage] = {
     status: patch.status ?? existing?.status ?? 'pending',
-    lastRunId: patch.lastRunId ?? existing?.lastRunId,
-    comment: patch.comment ?? existing?.comment,
+    lastRunId: 'lastRunId' in patch ? patch.lastRunId : existing?.lastRunId,
+    comment: 'comment' in patch ? patch.comment : existing?.comment,
     updatedAt: new Date().toISOString(),
   };
   writeState(workspaceRoot, state);
