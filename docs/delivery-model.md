@@ -19,13 +19,34 @@ Three revenue lines, one loop:
 
 ### 1. Onboarding (discovery)
 
-Client answers the setup questionnaire in the UI. The agent interviews rather than
-form-fills — the goal is finding the natural stage breakpoints in their existing
-workflow and the approvals that exist only in someone's inbox.
+**Primary path — SOP-seeded.** If the client has documented SOPs, those seed the
+workspace directly: SOPs are already prompts written for humans (see README). The
+intake is itself an ICM pipeline (no platform code required — it's just a workspace):
 
-**Reality check:** clients describe their workflow wrong the first time. The
-questionnaire gets ~70%; the first live case reveals the rest. Price accordingly —
-setup + first-N-cases accompaniment, never setup alone.
+```
+01_parse_sop → 02_stage_map (GATE: "is this your actual process?")
+             → 03_scaffold → 04_gap_questions → 05_validate
+```
+
+- The gate after `02_stage_map` is where correction is cheapest — before any folders
+  exist.
+- Every generated stage contract cites the SOP section it encodes (`[SOP §4.2]`), so
+  the client can verify the codification against the document they already trust —
+  and when the SOP is revised, the diff maps directly to which contracts need
+  updating, proposed through the gated improvement loop below.
+- The gaps the agent surfaces are billable findings in their own right ("your SOP
+  doesn't say who approves exceptions"). Expect 3–5 targeted gap questions instead
+  of the full questionnaire.
+- Qualification signal: clients with well-documented SOPs are the best-fit customers;
+  the upload conversation reveals engagement difficulty within a day.
+
+**Fallback path — questionnaire.** For undocumented processes, the agent interviews
+via the setup questionnaire — the goal is finding the natural stage breakpoints and
+the approvals that exist only in someone's inbox.
+
+**Reality check (both paths):** SOPs describe the compliance version of the process;
+people describe the ideal version. The first live case reveals the actual one. Price
+accordingly — setup + first-N-cases accompaniment, never setup alone.
 
 ### 2. Generation (the workspace-builder)
 
