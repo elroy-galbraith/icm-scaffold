@@ -6,7 +6,7 @@ import { getPipeline, type Pipeline } from '../api/client.js';
 
 vi.mock('../api/client.js', async () => {
   const actual = await vi.importActual<typeof import('../api/client.js')>('../api/client.js');
-  return { ...actual, getPipeline: vi.fn() };
+  return { ...actual, getPipeline: vi.fn(), runStage: vi.fn(), approveStage: vi.fn(), rejectStage: vi.fn() };
 });
 
 function renderWithClient(ui: React.ReactElement) {
@@ -34,12 +34,12 @@ describe('PipelineView', () => {
     expect(screen.getByTestId('pipeline-loading')).toBeInTheDocument();
   });
 
-  it('renders a row per stage once loaded', async () => {
+  it('renders a StageCard per stage once loaded', async () => {
     vi.mocked(getPipeline).mockResolvedValue(BASE_PIPELINE);
     renderWithClient(<PipelineView />);
-    await waitFor(() => expect(screen.getByTestId('stage-row-03_report')).toBeInTheDocument());
-    expect(screen.getByTestId('stage-row-01_research')).toHaveTextContent('approved');
-    expect(screen.getByTestId('stage-row-03_report')).toHaveTextContent('pending');
+    await waitFor(() => expect(screen.getByTestId('stagecard-03_report')).toBeInTheDocument());
+    expect(screen.getByTestId('stagecard-status-01_research')).toHaveTextContent('approved');
+    expect(screen.getByTestId('stagecard-status-03_report')).toHaveTextContent('pending');
   });
 
   it('shows a workspace-locked banner when pipeline.locked is true', async () => {
@@ -48,39 +48,20 @@ describe('PipelineView', () => {
     await waitFor(() => expect(screen.getByTestId('pipeline-locked')).toBeInTheDocument());
   });
 
-  it('shows a running indicator for the stage whose running field is true', async () => {
+  it('disables Run on a pending stage whose lower-numbered stage is not approved', async () => {
     vi.mocked(getPipeline).mockResolvedValue({
       ...BASE_PIPELINE,
-      locked: true,
-      stages: BASE_PIPELINE.stages.map((s) => (s.name === '03_report' ? { ...s, running: true } : s)),
+      stages: [
+        { name: '01_research', status: 'approved', running: false },
+        { name: '02_analysis', status: 'rejected', running: false, comment: 'redo' },
+        { name: '03_report', status: 'pending', running: false },
+      ],
     });
     renderWithClient(<PipelineView />);
-    await waitFor(() => expect(screen.getByTestId('stage-running-03_report')).toBeInTheDocument());
-    expect(screen.queryByTestId('stage-running-01_research')).not.toBeInTheDocument();
-  });
-
-  it('shows the failure reason for a pending stage whose last run errored', async () => {
-    vi.mocked(getPipeline).mockResolvedValue({
-      ...BASE_PIPELINE,
-      stages: BASE_PIPELINE.stages.map((s) =>
-        s.name === '03_report'
-          ? {
-              ...s,
-              lastRun: {
-                runId: 'run-9',
-                status: 'error',
-                endedAt: '2026-07-12T09:00:00.000Z',
-                tokensSpent: 100,
-                tokenBudget: 200000,
-                errorMessage: 'Too many consecutive tool errors',
-              },
-            }
-          : s
-      ),
-    });
-    renderWithClient(<PipelineView />);
-    await waitFor(() => expect(screen.getByTestId('stage-failure-03_report')).toBeInTheDocument());
-    expect(screen.getByTestId('stage-failure-03_report')).toHaveTextContent('Too many consecutive tool errors');
+    await waitFor(() => expect(screen.getByTestId('stagecard-run-03_report')).toBeInTheDocument());
+    const button = screen.getByTestId('stagecard-run-03_report');
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', expect.stringContaining('02_analysis'));
   });
 
   it('shows an error state when the pipeline fetch rejects', async () => {

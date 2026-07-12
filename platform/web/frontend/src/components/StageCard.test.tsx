@@ -1,0 +1,151 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { StageCard } from './StageCard.js';
+import type { StageView } from '../api/client.js';
+
+function makeStage(overrides: Partial<StageView> = {}): StageView {
+  return { name: '03_report', status: 'pending', running: false, ...overrides };
+}
+
+describe('StageCard', () => {
+  it('shows the stage name and status badge', () => {
+    render(
+      <StageCard stage={makeStage()} workspaceLocked={false} onRun={vi.fn()} onApprove={vi.fn()} onReject={vi.fn()} />
+    );
+    expect(screen.getByTestId('stagecard-03_report')).toHaveTextContent('03_report');
+    expect(screen.getByTestId('stagecard-status-03_report')).toHaveTextContent('pending');
+  });
+
+  it('shows a running indicator and hides the Run button while running', () => {
+    render(
+      <StageCard
+        stage={makeStage({ running: true })}
+        workspaceLocked={true}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('stagecard-running-03_report')).toBeInTheDocument();
+    expect(screen.queryByTestId('stagecard-run-03_report')).not.toBeInTheDocument();
+  });
+
+  it('shows a failure banner for a pending stage whose last run errored', () => {
+    render(
+      <StageCard
+        stage={makeStage({
+          lastRun: {
+            runId: 'run-1',
+            status: 'aborted_budget',
+            endedAt: '2026-07-12T09:00:00.000Z',
+            tokensSpent: 200000,
+            tokenBudget: 200000,
+            errorMessage: 'Token budget exceeded',
+          },
+        })}
+        workspaceLocked={false}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('stagecard-failure-03_report')).toHaveTextContent('Token budget exceeded');
+  });
+
+  it('shows the stored rejection comment for a rejected stage', () => {
+    render(
+      <StageCard
+        stage={makeStage({ status: 'rejected', comment: 'too shallow' })}
+        workspaceLocked={false}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('stagecard-comment-03_report')).toHaveTextContent('too shallow');
+  });
+
+  it('calls onRun with the stage name when Run is clicked', () => {
+    const onRun = vi.fn();
+    render(<StageCard stage={makeStage()} workspaceLocked={false} onRun={onRun} onApprove={vi.fn()} onReject={vi.fn()} />);
+    fireEvent.click(screen.getByTestId('stagecard-run-03_report'));
+    expect(onRun).toHaveBeenCalledWith('03_report');
+  });
+
+  it('disables Run and shows the blocking reason when blockedBy is set', () => {
+    render(
+      <StageCard
+        stage={makeStage()}
+        workspaceLocked={false}
+        blockedBy={{ stage: '02_analysis', status: 'pending' }}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    const button = screen.getByTestId('stagecard-run-03_report');
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', expect.stringContaining('02_analysis'));
+  });
+
+  it('disables Run when the workspace is locked', () => {
+    render(
+      <StageCard stage={makeStage()} workspaceLocked={true} onRun={vi.fn()} onApprove={vi.fn()} onReject={vi.fn()} />
+    );
+    expect(screen.getByTestId('stagecard-run-03_report')).toBeDisabled();
+  });
+
+  it('shows Approve/Reject only when awaiting_review, and calls onApprove', () => {
+    const onApprove = vi.fn();
+    const { rerender } = render(
+      <StageCard stage={makeStage()} workspaceLocked={false} onRun={vi.fn()} onApprove={onApprove} onReject={vi.fn()} />
+    );
+    expect(screen.queryByTestId('stagecard-approve-03_report')).not.toBeInTheDocument();
+
+    rerender(
+      <StageCard
+        stage={makeStage({ status: 'awaiting_review' })}
+        workspaceLocked={false}
+        onRun={vi.fn()}
+        onApprove={onApprove}
+        onReject={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTestId('stagecard-approve-03_report'));
+    expect(onApprove).toHaveBeenCalledWith('03_report');
+  });
+
+  it('requires a non-empty comment before Reject can be submitted', () => {
+    const onReject = vi.fn();
+    render(
+      <StageCard
+        stage={makeStage({ status: 'awaiting_review' })}
+        workspaceLocked={false}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={onReject}
+      />
+    );
+    const submit = screen.getByTestId('stagecard-reject-submit-03_report');
+    expect(submit).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId('stagecard-reject-comment-03_report'), { target: { value: 'too shallow' } });
+    expect(submit).not.toBeDisabled();
+    fireEvent.click(submit);
+    expect(onReject).toHaveBeenCalledWith('03_report', 'too shallow');
+  });
+
+  it('disables Approve/Reject when the workspace is locked', () => {
+    render(
+      <StageCard
+        stage={makeStage({ status: 'awaiting_review' })}
+        workspaceLocked={true}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('stagecard-approve-03_report')).toBeDisabled();
+    expect(screen.getByTestId('stagecard-reject-submit-03_report')).toBeDisabled();
+  });
+});
