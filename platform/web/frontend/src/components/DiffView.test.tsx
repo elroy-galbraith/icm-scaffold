@@ -12,6 +12,17 @@ const SAMPLE_DIFF = [
   '+New line.',
 ].join('\n');
 
+const NEW_FILE_DIFF = [
+  'diff --git a/somefile.md b/somefile.md',
+  'new file mode 100644',
+  'index 0000000..aa39060',
+  '--- /dev/null',
+  '+++ b/somefile.md',
+  '@@ -0,0 +1,2 @@',
+  '+# Somefile',
+  '+First line.',
+].join('\n');
+
 describe('DiffView', () => {
   it('shows a "no changes" message for an empty diff', () => {
     render(<DiffView diff="" path="report.md" />);
@@ -32,5 +43,24 @@ describe('DiffView', () => {
     render(<DiffView diff={SAMPLE_DIFF} path="report.md" />);
     expect(screen.getAllByTestId('diff-line-hunk')).toHaveLength(1);
     expect(screen.getAllByTestId('diff-line-context').length).toBeGreaterThan(0);
+  });
+
+  it('classifies new-file diff metadata lines as meta, not context', () => {
+    render(<DiffView diff={NEW_FILE_DIFF} path="somefile.md" />);
+
+    const metaLines = screen.getAllByTestId('diff-line-meta');
+    const metaText = metaLines.map((el) => el.textContent);
+    expect(metaText).toContain('new file mode 100644');
+    expect(metaText).toContain('index 0000000..aa39060');
+    expect(metaText).toContain('--- /dev/null');
+    expect(metaText).toContain('+++ b/somefile.md');
+    expect(metaText).toContain('diff --git a/somefile.md b/somefile.md');
+
+    expect(screen.queryByTestId('diff-line-context')).toBeNull();
+
+    const added = screen.getAllByTestId('diff-line-added');
+    expect(added).toHaveLength(2);
+    expect(added[0]).toHaveTextContent('# Somefile');
+    expect(added[1]).toHaveTextContent('First line.');
   });
 });

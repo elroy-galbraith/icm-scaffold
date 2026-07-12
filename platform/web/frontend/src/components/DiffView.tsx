@@ -5,8 +5,22 @@ export interface DiffViewProps {
 
 type LineKind = 'added' | 'removed' | 'hunk' | 'meta' | 'context';
 
+const META_PREFIXES = [
+  '+++',
+  '---',
+  'diff --git',
+  'new file mode ',
+  'deleted file mode ',
+  'index ',
+  'old mode ',
+  'new mode ',
+  'similarity index ',
+  'rename from ',
+  'rename to ',
+];
+
 function classifyLine(line: string): LineKind {
-  if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git')) return 'meta';
+  if (META_PREFIXES.some((prefix) => line.startsWith(prefix))) return 'meta';
   if (line.startsWith('@@')) return 'hunk';
   if (line.startsWith('+')) return 'added';
   if (line.startsWith('-')) return 'removed';
