@@ -3,6 +3,15 @@
 A production-ready scaffold implementing the **Interpretable Context Methodology** (ICM):
 multi-stage AI workflows orchestrated by *filesystem structure* instead of an agent framework.
 
+> **The pitch in one paragraph:** Your SOPs are already prompts — written for humans.
+> Turning them into automation normally means translating them into code or a vendor's
+> workflow builder, where they die. ICM lets an SOP stay a document — readable, editable
+> by the process owner, git-diffable — and become executable. Every run is auditable,
+> every human approval is on the record, and recurring corrections flow back into the
+> source documents so the system improves per run. No framework lock-in (plain markdown),
+> no model lock-in (one config line), no cloud lock-in (any S3-compatible store). And if
+> you leave, you keep the folder — still your SOP library, in plain text.
+
 > Based on: Van Clief & McDermott, *Interpretable Context Methodology: Folder Structure as
 > Agentic Architecture* ([arXiv:2603.16021](https://arxiv.org/abs/2603.16021)), MIT licensed.
 

@@ -7,10 +7,27 @@ Where this scaffold becomes a revenue asset rather than an artifact. Companion t
 
 ## Positioning
 
+**The core insight: SOPs are already prompts — written for humans.** Companies spent
+years writing standard operating procedures; the pain is that automating an SOP
+normally means translating it into code or a vendor's workflow builder, where the
+process owner can no longer read or change it. ICM lets the SOP stay a document —
+readable, editable, git-diffable — and become executable. The buyer isn't adopting
+"AI workflows"; they're making the process documentation they already trust run.
+
 The sellable claim is never "AI makes the decision." It is:
 
 > The decision package assembles itself. Every number traces to a source document.
 > Your people decide, through your existing workflow, faster.
+
+The no-lock-in story closes procurement conversations: no framework (plain markdown),
+no model lock (an OpenRouter slug in a config file), no cloud lock (docker-compose +
+any S3-compatible store). Exit story: they keep the folder, and it's still their SOP
+library in plain text. Competing platforms cannot say that sentence.
+
+**Caveat to state proactively:** "codify your existing SOPs" undersells discovery.
+SOPs describe the process people are supposed to follow; the first live case reveals
+the one they actually follow. That gap is why accompaniment is priced into the
+delivery model — and why this is defensible consulting work, not just software setup.
 
 Three assets carry the value — the scaffold itself is MIT-licensed convention and not
 defensible:
