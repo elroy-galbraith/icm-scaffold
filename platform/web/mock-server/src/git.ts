@@ -54,14 +54,33 @@ function walk(root: string, dir: string, entries: TreeEntry[]): void {
   }
 }
 
+export class InvalidRefError extends Error {}
+
+/**
+ * `ref` is passed to `git diff` as a positional argument before the `--` path
+ * separator. Any value starting with `-` is parsed by git as an OPTION, not a
+ * revision (e.g. `--output=/tmp/x` makes git write the diff to an
+ * attacker-chosen filesystem path instead of stdout). No legitimate git
+ * ref/revision ever starts with a hyphen, so rejecting that is sufficient and
+ * safe. This check must happen here, since this is the function that
+ * actually shells out to git.
+ */
+function assertSafeRef(ref: string): void {
+  if (ref.startsWith('-')) {
+    throw new InvalidRefError(`invalid ref: ${ref}`);
+  }
+}
+
 export function getDiff(workspaceRoot: string, path: string, ref: string): DiffResult {
+  assertSafeRef(ref);
   try {
     const diff = execFileSync('git', ['diff', ref, '--', path], {
       cwd: workspaceRoot,
       stdio: ['pipe', 'pipe', 'pipe'],
     }).toString();
     return { path, ref, diff };
-  } catch {
+  } catch (err) {
+    if (err instanceof InvalidRefError) throw err;
     return { path, ref, diff: '' };
   }
 }

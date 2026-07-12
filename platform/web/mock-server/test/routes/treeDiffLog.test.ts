@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +40,41 @@ describe('GET /api/tree, /api/diff, /api/log', () => {
   });
 
   it('GET /api/diff shows a non-empty diff after a committed edit', async () => {
+    writeFileSync(join(config.scratchDir, 'shared/client-brief.md'), 'A materially different brief.');
+    const { execFileSync } = await import('node:child_process');
+    execFileSync('git', ['add', '-A'], { cwd: config.scratchDir });
+    execFileSync('git', ['commit', '-m', 'edit brief'], { cwd: config.scratchDir });
+
+    const app = createApp(config);
+    const res = await request(app).get('/api/diff').query({ path: 'shared/client-brief.md', ref: 'HEAD~1' });
+    expect(res.status).toBe(200);
+    expect(res.body.diff).toContain('materially different');
+  });
+
+  it('GET /api/diff rejects a ref that looks like a git option and does not write the target file (argument-injection regression)', async () => {
+    const exfilTarget = join(mkdtempSync(join(tmpdir(), 'diff-exfil-')), 'repro-exfil.txt');
+    expect(existsSync(exfilTarget)).toBe(false);
+
+    const app = createApp(config);
+    const res = await request(app)
+      .get('/api/diff')
+      .query({ path: 'shared/client-brief.md', ref: `--output=${exfilTarget}` });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'invalid ref' });
+    expect(existsSync(exfilTarget)).toBe(false);
+
+    rmSync(exfilTarget, { force: true });
+  });
+
+  it('GET /api/diff requires path and returns 400 when it is missing', async () => {
+    const app = createApp(config);
+    const res = await request(app).get('/api/diff').query({ ref: 'HEAD~1' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'path is required' });
+  });
+
+  it('GET /api/diff still succeeds for a legitimate ref and path (happy path unchanged)', async () => {
     writeFileSync(join(config.scratchDir, 'shared/client-brief.md'), 'A materially different brief.');
     const { execFileSync } = await import('node:child_process');
     execFileSync('git', ['add', '-A'], { cwd: config.scratchDir });
