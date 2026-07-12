@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from './ui/Button.js';
 
 export interface GateActionsProps {
   stage: string;
@@ -12,23 +13,26 @@ export function GateActions({ stage, disabled, onApprove, onReject }: GateAction
   const canReject = comment.trim().length > 0;
 
   return (
-    <div data-testid={`gate-actions-${stage}`}>
-      <button
+    <div data-testid={`gate-actions-${stage}`} className="flex flex-col gap-2 border-t border-border pt-2">
+      <Button
         type="button"
+        variant="primary"
         data-testid={`gate-approve-${stage}`}
         disabled={disabled}
         onClick={() => onApprove(stage)}
       >
         Approve
-      </button>
+      </Button>
       <textarea
         data-testid={`gate-reject-comment-${stage}`}
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         placeholder="Reason for rejecting"
+        className="w-full rounded border border-border bg-white px-2 py-1.5 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-ink"
       />
-      <button
+      <Button
         type="button"
+        variant="destructive"
         data-testid={`gate-reject-submit-${stage}`}
         disabled={disabled || !canReject}
         onClick={() => {
@@ -37,7 +41,7 @@ export function GateActions({ stage, disabled, onApprove, onReject }: GateAction
         }}
       >
         Reject
-      </button>
+      </Button>
     </div>
   );
 }
