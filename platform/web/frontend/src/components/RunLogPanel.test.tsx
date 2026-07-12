@@ -39,6 +39,34 @@ describe('RunLogPanel', () => {
     expect(screen.getByTestId('run-log-tool-call-1')).toHaveTextContent('finish_stage');
   });
 
+  it('shows the target file path for a write_file tool-call entry', () => {
+    const logWithWrite: RunLog = {
+      ...COMPLETED_LOG,
+      toolCalls: [
+        ...COMPLETED_LOG.toolCalls,
+        {
+          tool: 'write_file',
+          args: { path: 'stages/03_report/output/report.md' },
+          result: 'ok',
+          timestamp: '2026-07-12T09:00:01.500Z',
+        },
+      ],
+    };
+    render(<RunLogPanel runLog={logWithWrite} />);
+    expect(screen.getByTestId('run-log-tool-call-2')).toHaveTextContent('write_file');
+    expect(screen.getByTestId('run-log-tool-call-2')).toHaveTextContent(
+      'stages/03_report/output/report.md'
+    );
+  });
+
+  it('renders a finish_stage entry (no path arg) without crashing or showing garbage', () => {
+    render(<RunLogPanel runLog={COMPLETED_LOG} />);
+    const finishEntry = screen.getByTestId('run-log-tool-call-1');
+    expect(finishEntry).toHaveTextContent('finish_stage');
+    expect(finishEntry).not.toHaveTextContent('undefined');
+    expect(finishEntry).not.toHaveTextContent('[object Object]');
+  });
+
   it('shows the gate summary for a completed run', () => {
     render(<RunLogPanel runLog={COMPLETED_LOG} />);
     expect(screen.getByTestId('run-log-gate-summary')).toHaveTextContent('Verify: report is non-empty.');

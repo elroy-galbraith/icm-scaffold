@@ -1,7 +1,13 @@
-import type { RunLog } from '../api/client.js';
+import type { RunLog, ToolCallLogEntry } from '../api/client.js';
 
 export interface RunLogPanelProps {
   runLog: RunLog;
+}
+
+/** Safely reads the `path` arg from a tool call, when present (read_file, write_file, list_dir). */
+function toolCallPath(call: ToolCallLogEntry): string | undefined {
+  const path = call.args.path;
+  return typeof path === 'string' ? path : undefined;
 }
 
 export function RunLogPanel({ runLog }: RunLogPanelProps) {
@@ -37,12 +43,16 @@ export function RunLogPanel({ runLog }: RunLogPanelProps) {
 
       <h4>Tool calls</h4>
       <ul data-testid="run-log-tool-calls">
-        {runLog.toolCalls.map((call, index) => (
-          <li key={index} data-testid={`run-log-tool-call-${index}`}>
-            {call.tool} — {call.result}
-            {call.errorMessage ? `: ${call.errorMessage}` : ''}
-          </li>
-        ))}
+        {runLog.toolCalls.map((call, index) => {
+          const path = toolCallPath(call);
+          return (
+            <li key={index} data-testid={`run-log-tool-call-${index}`}>
+              {call.tool}
+              {path ? ` (${path})` : ''} — {call.result}
+              {call.errorMessage ? `: ${call.errorMessage}` : ''}
+            </li>
+          );
+        })}
       </ul>
 
       {runLog.gateSummary && <p data-testid="run-log-gate-summary">{runLog.gateSummary}</p>}
