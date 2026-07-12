@@ -52,6 +52,18 @@ describe('loadConfig', () => {
     expect(() => loadConfig(workspaceRoot)).toThrow(/tokenBudget/);
   });
 
+  it('throws ConfigError naming "tokenBudget" for a fractional budget', () => {
+    writeFileSync(join(workspaceRoot, 'runner.config.json'), JSON.stringify({ tokenBudget: 1.5 }));
+    expect(() => loadConfig(workspaceRoot)).toThrow(ConfigError);
+    expect(() => loadConfig(workspaceRoot)).toThrow(/tokenBudget/);
+  });
+
+  it('throws ConfigError naming the unexpected field for an unknown top-level key', () => {
+    writeFileSync(join(workspaceRoot, 'runner.config.json'), JSON.stringify({ notAField: true }));
+    expect(() => loadConfig(workspaceRoot)).toThrow(ConfigError);
+    expect(() => loadConfig(workspaceRoot)).toThrow(/notAField/);
+  });
+
   it('throws ConfigError naming "allowedDomains" when not an array of strings', () => {
     writeFileSync(join(workspaceRoot, 'runner.config.json'), JSON.stringify({ allowedDomains: ['ok', 5] }));
     expect(() => loadConfig(workspaceRoot)).toThrow(/allowedDomains/);

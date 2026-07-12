@@ -42,6 +42,13 @@ export function loadConfig(workspaceRoot: string): RunnerConfig {
     throw new ConfigError('<root>', 'runner.config.json must be a JSON object');
   }
   const obj = raw as Record<string, unknown>;
+  const allowedFields = ['model', 'tokenBudget', 'allowedDomains'];
+  for (const key of Object.keys(obj)) {
+    if (!allowedFields.includes(key)) {
+      throw new ConfigError(key, `unknown field (not one of ${allowedFields.join(', ')})`);
+    }
+  }
+
   const config: RunnerConfig = { ...DEFAULTS, allowedDomains: [...DEFAULTS.allowedDomains] };
 
   if ('model' in obj) {
@@ -52,8 +59,8 @@ export function loadConfig(workspaceRoot: string): RunnerConfig {
   }
 
   if ('tokenBudget' in obj) {
-    if (typeof obj.tokenBudget !== 'number' || !Number.isFinite(obj.tokenBudget) || obj.tokenBudget <= 0) {
-      throw new ConfigError('tokenBudget', 'must be a positive finite number');
+    if (typeof obj.tokenBudget !== 'number' || !Number.isInteger(obj.tokenBudget) || obj.tokenBudget <= 0) {
+      throw new ConfigError('tokenBudget', 'must be a positive integer');
     }
     config.tokenBudget = obj.tokenBudget;
   }
