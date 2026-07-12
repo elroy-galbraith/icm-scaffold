@@ -213,4 +213,43 @@ describe('StageCard', () => {
     fireEvent.change(screen.getByTestId('stagecard-reject-comment-03_report'), { target: { value: 'too shallow' } });
     expect(screen.getByTestId('stagecard-reject-submit-03_report')).toBeDisabled();
   });
+
+  it('renders a "View last run" button when lastRun and onViewRun are both provided', () => {
+    const onViewRun = vi.fn();
+    render(
+      <StageCard
+        stage={makeStage({
+          status: 'approved',
+          lastRun: {
+            runId: 'run-1',
+            status: 'completed',
+            endedAt: '2026-07-12T09:00:00.000Z',
+            tokensSpent: 800,
+            tokenBudget: 200000,
+          },
+        })}
+        workspaceLocked={false}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onViewRun={onViewRun}
+      />
+    );
+    fireEvent.click(screen.getByTestId('stagecard-viewrun-03_report'));
+    expect(onViewRun).toHaveBeenCalledWith('run-1');
+  });
+
+  it('does not render "View last run" when there is no lastRun', () => {
+    render(
+      <StageCard
+        stage={makeStage()}
+        workspaceLocked={false}
+        onRun={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onViewRun={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId('stagecard-viewrun-03_report')).not.toBeInTheDocument();
+  });
 });

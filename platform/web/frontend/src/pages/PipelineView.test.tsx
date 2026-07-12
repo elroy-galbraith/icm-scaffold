@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PipelineView } from './PipelineView.js';
-import { getPipeline, runStage, getTree, getFile, putFile, getDiff, type Pipeline } from '../api/client.js';
+import { getPipeline, runStage, getTree, getFile, putFile, getDiff, getRun, type Pipeline } from '../api/client.js';
 
 vi.mock('../api/client.js', async () => {
   const actual = await vi.importActual<typeof import('../api/client.js')>('../api/client.js');
@@ -24,6 +24,7 @@ vi.mock('../api/client.js', async () => {
     // unmocked ['diff', path] query (diffQuery fetches whenever a file is selected). Tests
     // that do care override this with their own vi.mocked(getDiff).mockResolvedValue(...).
     getDiff: vi.fn().mockResolvedValue({ path: '', ref: 'HEAD~1', diff: '' }),
+    getRun: vi.fn(),
   };
 });
 
@@ -253,5 +254,48 @@ describe('PipelineView', () => {
     await waitFor(() => expect(screen.getByTestId('diff-view')).toBeInTheDocument());
     expect(getDiff).toHaveBeenCalledWith('shared/client-brief.md');
     expect(screen.getAllByTestId('diff-line-added')[0]).toHaveTextContent('New');
+  });
+
+  it('shows the run log for the last run when "View last run" is clicked', async () => {
+    vi.mocked(getPipeline).mockResolvedValue({
+      ...BASE_PIPELINE,
+      stages: BASE_PIPELINE.stages.map((s) =>
+        s.name === '01_research'
+          ? {
+              ...s,
+              lastRun: {
+                runId: 'run-1',
+                status: 'completed',
+                endedAt: '2026-07-12T09:00:00.000Z',
+                tokensSpent: 800,
+                tokenBudget: 200000,
+              },
+            }
+          : s
+      ),
+    });
+    vi.mocked(getTree).mockResolvedValue([]);
+    vi.mocked(getRun).mockResolvedValue({
+      runId: 'run-1',
+      stage: '01_research',
+      model: 'anthropic/claude-sonnet-5',
+      startedAt: '2026-07-12T08:59:00.000Z',
+      endedAt: '2026-07-12T09:00:00.000Z',
+      status: 'completed',
+      filesRead: [],
+      filesWritten: ['stages/01_research/output/findings.md'],
+      toolCalls: [],
+      tokensSpent: 800,
+      tokenBudget: 200000,
+      gateSummary: 'Done.',
+    });
+    renderWithClient(<PipelineView />);
+
+    await waitFor(() => expect(screen.getByTestId('stagecard-viewrun-01_research')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('stagecard-viewrun-01_research'));
+
+    await waitFor(() => expect(screen.getByTestId('run-log-panel')).toBeInTheDocument());
+    expect(getRun).toHaveBeenCalledWith('run-1');
+    expect(screen.getByTestId('run-log-gate-summary')).toHaveTextContent('Done.');
   });
 });

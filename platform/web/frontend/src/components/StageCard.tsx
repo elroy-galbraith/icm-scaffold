@@ -11,6 +11,7 @@ export interface StageCardProps {
   onRun: (stage: string) => void;
   onApprove: (stage: string) => void;
   onReject: (stage: string, comment: string) => void;
+  onViewRun?: (runId: string) => void;
 }
 
 export function StageCard({
@@ -23,6 +24,7 @@ export function StageCard({
   onRun,
   onApprove,
   onReject,
+  onViewRun,
 }: StageCardProps) {
   const [comment, setComment] = useState('');
   const failed =
@@ -49,6 +51,16 @@ export function StageCard({
 
       {stage.status === 'rejected' && stage.comment && (
         <p data-testid={`stagecard-comment-${stage.name}`}>Rejected: {stage.comment}</p>
+      )}
+
+      {stage.lastRun && onViewRun && (
+        <button
+          type="button"
+          data-testid={`stagecard-viewrun-${stage.name}`}
+          onClick={() => onViewRun(stage.lastRun!.runId)}
+        >
+          View last run
+        </button>
       )}
 
       {!stage.running && (

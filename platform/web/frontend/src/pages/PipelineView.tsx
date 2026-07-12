@@ -9,12 +9,14 @@ import {
   getFile,
   putFile,
   getDiff,
+  getRun,
   type StageStatus,
 } from '../api/client.js';
 import { StageCard } from '../components/StageCard.js';
 import { MarkdownViewer } from '../components/MarkdownViewer.js';
 import { MarkdownEditor } from '../components/MarkdownEditor.js';
 import { DiffView } from '../components/DiffView.js';
+import { RunLogPanel } from '../components/RunLogPanel.js';
 
 function addTo(set: Set<string>, name: string): Set<string> {
   const next = new Set(set);
@@ -47,6 +49,7 @@ export function PipelineView() {
   const queryClient = useQueryClient();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['pipeline'],
@@ -64,6 +67,11 @@ export function PipelineView() {
     queryKey: ['diff', selectedPath],
     queryFn: () => getDiff(selectedPath as string),
     enabled: selectedPath !== null,
+  });
+  const runLogQuery = useQuery({
+    queryKey: ['run', selectedRunId],
+    queryFn: () => getRun(selectedRunId as string),
+    enabled: selectedRunId !== null,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['pipeline'] });
@@ -157,6 +165,7 @@ export function PipelineView() {
             onRun={handleRun}
             onApprove={handleApprove}
             onReject={handleReject}
+            onViewRun={(runId) => setSelectedRunId(runId)}
           />
         ))}
       </div>
@@ -180,6 +189,8 @@ export function PipelineView() {
           ))}
         </ul>
       </aside>
+
+      {runLogQuery.data && <RunLogPanel runLog={runLogQuery.data} />}
 
       {selectedPath && fileQuery.data && (
         <section>
