@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getPipeline,
@@ -10,6 +10,7 @@ import {
   putFile,
   getDiff,
   getRun,
+  ApiError,
   type StageStatus,
 } from '../api/client.js';
 import { StageCard } from '../components/StageCard.js';
@@ -31,6 +32,26 @@ function removeFrom(set: Set<string>, name: string): Set<string> {
 }
 
 export const POLL_INTERVAL_MS = 2000;
+
+export function describeApiError(err: unknown): string {
+  if (err instanceof ApiError) {
+    const body = (err.body ?? {}) as Record<string, unknown>;
+    if (err.status === 409 && typeof body.runId === 'string') {
+      return `Locked: run ${body.runId} is in progress on stage ${String(body.stage)}.`;
+    }
+    if (err.status === 409 && typeof body.status === 'string') {
+      return `Stage ${String(body.stage)} is ${body.status}, not awaiting review.`;
+    }
+    if (err.status === 422 && typeof body.blockingStage === 'string') {
+      return `Blocked: ${body.blockingStage} is ${String(body.blockingStatus)}, must be approved first.`;
+    }
+    if (err.status === 403 && typeof body.error === 'string') {
+      return `Forbidden: ${body.error}`;
+    }
+    return `API error ${err.status}`;
+  }
+  return err instanceof Error ? err.message : 'Unknown error';
+}
 
 function computeBlockedBy(
   stages: Array<{ name: string; status: StageStatus }>,
@@ -76,6 +97,19 @@ export function PipelineView() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['pipeline'] });
 
+  // Toasts are a list, not a single slot: multiple mutations (e.g. a Run 409 on one stage and
+  // an Approve 422 on another) can fail around the same time, and each failure names a specific
+  // stage/reason the user needs to see. A single "current error" slot would silently drop an
+  // earlier still-relevant error the moment a second one lands. Each toast gets its own id so
+  // it can be dismissed independently of the others.
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string }>>([]);
+  const nextToastId = useRef(0);
+  const pushToast = (message: string) => {
+    const id = nextToastId.current++;
+    setToasts((t) => [...t, { id, message }]);
+  };
+  const dismissToast = (id: number) => setToasts((t) => t.filter((toast) => toast.id !== id));
+
   // Each mutation below is a single shared object reused across every StageCard, so
   // `mutation.variables`/`mutation.isPending` only ever reflects the single most recent
   // `.mutate()` call — it cannot represent "stage A is still in flight while stage B was
@@ -88,20 +122,28 @@ export function PipelineView() {
   const runMutation = useMutation({
     mutationFn: (stage: string) => runStage(stage),
     onSuccess: invalidate,
-    // Error surfacing (toasts naming the 409/422 detail) is added in Task 18.
-    onError: () => invalidate(),
+    onError: (err) => {
+      pushToast(describeApiError(err));
+      invalidate();
+    },
     onSettled: (_data, _error, stage) => setPendingRuns((prev) => removeFrom(prev, stage)),
   });
   const approveMutation = useMutation({
     mutationFn: (stage: string) => approveStage(stage),
     onSuccess: invalidate,
-    onError: () => invalidate(),
+    onError: (err) => {
+      pushToast(describeApiError(err));
+      invalidate();
+    },
     onSettled: (_data, _error, stage) => setPendingApprovals((prev) => removeFrom(prev, stage)),
   });
   const rejectMutation = useMutation({
     mutationFn: ({ stage, comment }: { stage: string; comment: string }) => rejectStage(stage, comment),
     onSuccess: invalidate,
-    onError: () => invalidate(),
+    onError: (err) => {
+      pushToast(describeApiError(err));
+      invalidate();
+    },
     onSettled: (_data, _error, variables) => setPendingRejections((prev) => removeFrom(prev, variables.stage)),
   });
   const saveFileMutation = useMutation({
@@ -122,6 +164,7 @@ export function PipelineView() {
       queryClient.invalidateQueries({ queryKey: ['file', variables.path] });
       queryClient.invalidateQueries({ queryKey: ['tree'] });
     },
+    onError: (err) => pushToast(describeApiError(err)),
   });
 
   const handleRun = (stage: string) => {
@@ -148,6 +191,18 @@ export function PipelineView() {
 
   return (
     <main>
+      {toasts.length > 0 && (
+        <div data-testid="toast-list">
+          {toasts.map((toast) => (
+            <div key={toast.id} data-testid={`toast-${toast.id}`}>
+              {toast.message}
+              <button type="button" data-testid={`toast-dismiss-${toast.id}`} onClick={() => dismissToast(toast.id)}>
+                Dismiss
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <h1>ICM Pipeline</h1>
       {data.locked && (
         <p data-testid="pipeline-locked">A run is in progress — actions are disabled workspace-wide.</p>

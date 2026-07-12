@@ -100,7 +100,7 @@ describe('StageCard', () => {
     const { rerender } = render(
       <StageCard stage={makeStage()} workspaceLocked={false} onRun={vi.fn()} onApprove={onApprove} onReject={vi.fn()} />
     );
-    expect(screen.queryByTestId('stagecard-approve-03_report')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('gate-approve-03_report')).not.toBeInTheDocument();
 
     rerender(
       <StageCard
@@ -111,7 +111,7 @@ describe('StageCard', () => {
         onReject={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByTestId('stagecard-approve-03_report'));
+    fireEvent.click(screen.getByTestId('gate-approve-03_report'));
     expect(onApprove).toHaveBeenCalledWith('03_report');
   });
 
@@ -126,10 +126,10 @@ describe('StageCard', () => {
         onReject={onReject}
       />
     );
-    const submit = screen.getByTestId('stagecard-reject-submit-03_report');
+    const submit = screen.getByTestId('gate-reject-submit-03_report');
     expect(submit).toBeDisabled();
 
-    fireEvent.change(screen.getByTestId('stagecard-reject-comment-03_report'), { target: { value: 'too shallow' } });
+    fireEvent.change(screen.getByTestId('gate-reject-comment-03_report'), { target: { value: 'too shallow' } });
     expect(submit).not.toBeDisabled();
     fireEvent.click(submit);
     expect(onReject).toHaveBeenCalledWith('03_report', 'too shallow');
@@ -145,8 +145,8 @@ describe('StageCard', () => {
         onReject={vi.fn()}
       />
     );
-    expect(screen.getByTestId('stagecard-approve-03_report')).toBeDisabled();
-    expect(screen.getByTestId('stagecard-reject-submit-03_report')).toBeDisabled();
+    expect(screen.getByTestId('gate-approve-03_report')).toBeDisabled();
+    expect(screen.getByTestId('gate-reject-submit-03_report')).toBeDisabled();
   });
 
   it('shows a failure banner for a pending stage whose last run errored with status "error"', () => {
@@ -196,7 +196,7 @@ describe('StageCard', () => {
         onReject={vi.fn()}
       />
     );
-    expect(screen.getByTestId('stagecard-approve-03_report')).toBeDisabled();
+    expect(screen.getByTestId('gate-approve-03_report')).toBeDisabled();
   });
 
   it('disables Reject-submit while a reject mutation is pending for this stage, even with a comment', () => {
@@ -210,8 +210,8 @@ describe('StageCard', () => {
         onReject={vi.fn()}
       />
     );
-    fireEvent.change(screen.getByTestId('stagecard-reject-comment-03_report'), { target: { value: 'too shallow' } });
-    expect(screen.getByTestId('stagecard-reject-submit-03_report')).toBeDisabled();
+    fireEvent.change(screen.getByTestId('gate-reject-comment-03_report'), { target: { value: 'too shallow' } });
+    expect(screen.getByTestId('gate-reject-submit-03_report')).toBeDisabled();
   });
 
   it('renders a "View last run" button when lastRun and onViewRun are both provided', () => {

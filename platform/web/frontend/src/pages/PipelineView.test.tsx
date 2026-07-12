@@ -2,7 +2,17 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PipelineView } from './PipelineView.js';
-import { getPipeline, runStage, getTree, getFile, putFile, getDiff, getRun, type Pipeline } from '../api/client.js';
+import {
+  getPipeline,
+  runStage,
+  getTree,
+  getFile,
+  putFile,
+  getDiff,
+  getRun,
+  ApiError,
+  type Pipeline,
+} from '../api/client.js';
 
 vi.mock('../api/client.js', async () => {
   const actual = await vi.importActual<typeof import('../api/client.js')>('../api/client.js');
@@ -297,5 +307,51 @@ describe('PipelineView', () => {
     await waitFor(() => expect(screen.getByTestId('run-log-panel')).toBeInTheDocument());
     expect(getRun).toHaveBeenCalledWith('run-1');
     expect(screen.getByTestId('run-log-gate-summary')).toHaveTextContent('Done.');
+  });
+
+  it('shows a toast naming the lock holder when Run races into a 409', async () => {
+    vi.mocked(getPipeline).mockResolvedValue(BASE_PIPELINE);
+    vi.mocked(getTree).mockResolvedValue([]);
+    vi.mocked(runStage).mockRejectedValue(
+      new ApiError(409, { runId: 'other-run', stage: '02_analysis', acquiredAt: '2026-07-12T09:00:00.000Z' })
+    );
+    renderWithClient(<PipelineView />);
+
+    await waitFor(() => expect(screen.getByTestId('stagecard-run-01_research')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('stagecard-run-01_research'));
+
+    await waitFor(() => expect(screen.getByTestId('toast-list')).toBeInTheDocument());
+    expect(screen.getByTestId('toast-list')).toHaveTextContent('other-run');
+    expect(screen.getByTestId('toast-list')).toHaveTextContent('02_analysis');
+  });
+
+  it('shows a toast naming the blocking stage when Run races into a 422', async () => {
+    vi.mocked(getPipeline).mockResolvedValue(BASE_PIPELINE);
+    vi.mocked(getTree).mockResolvedValue([]);
+    vi.mocked(runStage).mockRejectedValue(
+      new ApiError(422, { blockingStage: '02_analysis', blockingStatus: 'pending' })
+    );
+    renderWithClient(<PipelineView />);
+
+    await waitFor(() => expect(screen.getByTestId('stagecard-run-01_research')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('stagecard-run-01_research'));
+
+    await waitFor(() => expect(screen.getByTestId('toast-list')).toBeInTheDocument());
+    expect(screen.getByTestId('toast-list')).toHaveTextContent('Blocked');
+    expect(screen.getByTestId('toast-list')).toHaveTextContent('02_analysis');
+  });
+
+  it('dismisses a toast when its Dismiss button is clicked', async () => {
+    vi.mocked(getPipeline).mockResolvedValue(BASE_PIPELINE);
+    vi.mocked(getTree).mockResolvedValue([]);
+    vi.mocked(runStage).mockRejectedValue(new ApiError(409, { runId: 'x', stage: '01_research', acquiredAt: 'now' }));
+    renderWithClient(<PipelineView />);
+
+    await waitFor(() => expect(screen.getByTestId('stagecard-run-01_research')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('stagecard-run-01_research'));
+    await waitFor(() => expect(screen.getByTestId('toast-list')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('toast-dismiss-0'));
+    expect(screen.queryByTestId('toast-list')).not.toBeInTheDocument();
   });
 });

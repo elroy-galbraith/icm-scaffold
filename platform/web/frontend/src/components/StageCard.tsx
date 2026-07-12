@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import type { StageStatus, StageView } from '../api/client.js';
+import { GateActions } from './GateActions.js';
 
 export interface StageCardProps {
   stage: StageView;
@@ -26,7 +26,6 @@ export function StageCard({
   onReject,
   onViewRun,
 }: StageCardProps) {
-  const [comment, setComment] = useState('');
   const failed =
     stage.status === 'pending' &&
     stage.lastRun != null &&
@@ -36,6 +35,10 @@ export function StageCard({
   const runTitle = blockedBy
     ? `Blocked: ${blockedBy.stage} is ${blockedBy.status}, must be approved first.`
     : undefined;
+  // GateActions exposes a single `disabled` flag covering both Approve and Reject (they're
+  // mutually exclusive actions on the same gate), so fold the two independently-tracked
+  // pending flags into it here rather than narrowing GateActions's contract.
+  const gateDisabled = workspaceLocked || isApprovePending || isRejectPending;
 
   return (
     <section data-testid={`stagecard-${stage.name}`}>
@@ -76,30 +79,7 @@ export function StageCard({
       )}
 
       {stage.status === 'awaiting_review' && (
-        <div>
-          <button
-            type="button"
-            data-testid={`stagecard-approve-${stage.name}`}
-            disabled={workspaceLocked || isApprovePending}
-            onClick={() => onApprove(stage.name)}
-          >
-            Approve
-          </button>
-          <textarea
-            data-testid={`stagecard-reject-comment-${stage.name}`}
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Reason for rejecting"
-          />
-          <button
-            type="button"
-            data-testid={`stagecard-reject-submit-${stage.name}`}
-            disabled={workspaceLocked || comment.trim().length === 0 || isRejectPending}
-            onClick={() => onReject(stage.name, comment)}
-          >
-            Reject
-          </button>
-        </div>
+        <GateActions stage={stage.name} disabled={gateDisabled} onApprove={onApprove} onReject={onReject} />
       )}
     </section>
   );
