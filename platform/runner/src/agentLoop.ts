@@ -5,6 +5,7 @@ import type { RunStatus, ToolCallLogEntry } from './runLog.js';
 
 export const DEFAULT_MODEL = 'anthropic/claude-sonnet-5';
 export const DEFAULT_TOKEN_BUDGET = 200_000;
+export const DEFAULT_MAX_TOKENS = 4096;
 const MAX_TOOL_ERROR_RETRIES = 3;
 const MAX_ITERATIONS = 50;
 
@@ -14,6 +15,7 @@ export interface AgentLoopParams {
   model?: string;
   apiKey: string;
   tokenBudget?: number;
+  maxTokens?: number;
   chatCompletionFn?: ChatCompletionFn;
 }
 
@@ -43,6 +45,7 @@ function systemPrompt(stage: string): string {
 export async function runAgentLoop(params: AgentLoopParams): Promise<AgentLoopResult> {
   const model = params.model ?? DEFAULT_MODEL;
   const tokenBudgetLimit = params.tokenBudget ?? DEFAULT_TOKEN_BUDGET;
+  const maxTokens = params.maxTokens ?? DEFAULT_MAX_TOKENS;
   const chat = params.chatCompletionFn ?? defaultChatCompletion;
   const budget = new TokenBudget(tokenBudgetLimit);
   const ctx: ToolContext = createToolContext(params.workspaceRoot);
@@ -56,7 +59,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentLoopRe
 
   try {
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-      const response = await chat({ model, messages, tools: TOOL_DEFS, apiKey: params.apiKey });
+      const response = await chat({ model, messages, tools: TOOL_DEFS, apiKey: params.apiKey, maxTokens });
       budget.add(response.totalTokens);
       messages.push(response.message);
 

@@ -27,6 +27,7 @@ export interface ChatCompletionParams {
   messages: ChatMessage[];
   tools: ToolDef[];
   apiKey: string;
+  maxTokens?: number;
 }
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -42,6 +43,7 @@ export async function chatCompletion(params: ChatCompletionParams): Promise<Chat
       model: params.model,
       messages: params.messages,
       tools: params.tools,
+      ...(params.maxTokens !== undefined ? { max_tokens: params.maxTokens } : {}),
     }),
   });
 

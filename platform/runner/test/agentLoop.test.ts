@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync, cpSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runAgentLoop } from '../src/agentLoop.js';
-import type { ChatCompletionFn, ChatCompletionResult } from '../src/openrouter.js';
+import { runAgentLoop, DEFAULT_MAX_TOKENS } from '../src/agentLoop.js';
+import type { ChatCompletionFn, ChatCompletionParams, ChatCompletionResult } from '../src/openrouter.js';
 
 const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/workspace', import.meta.url));
 
@@ -13,9 +13,10 @@ interface ScriptStep {
   totalTokens: number;
 }
 
-function scriptedChat(script: ScriptStep[]): ChatCompletionFn {
+function scriptedChat(script: ScriptStep[], onCall?: (params: ChatCompletionParams) => void): ChatCompletionFn {
   let call = 0;
-  return async (): Promise<ChatCompletionResult> => {
+  return async (params: ChatCompletionParams): Promise<ChatCompletionResult> => {
+    onCall?.(params);
     const step = script[call];
     call++;
     if (!step) throw new Error('Script exhausted');
@@ -80,6 +81,64 @@ describe('runAgentLoop', () => {
     expect(readFileSync(join(workspaceRoot, 'stages/01_research/output/findings.md'), 'utf-8')).toBe(
       '# Findings\n'
     );
+  });
+
+  it('passes the default max_tokens to every chat call when no override is given', async () => {
+    const capturedParams: ChatCompletionParams[] = [];
+    const chat = scriptedChat(
+      [
+        { toolCalls: [{ name: 'read_file', args: { path: 'CLAUDE.md' } }], totalTokens: 50 },
+        {
+          toolCalls: [
+            { name: 'finish_stage', args: { gateSummary: 'Done. Verify: nothing to check.' } },
+          ],
+          totalTokens: 30,
+        },
+      ],
+      (params) => capturedParams.push(params)
+    );
+
+    const result = await runAgentLoop({
+      workspaceRoot,
+      stage: '01_research',
+      apiKey: 'test-key',
+      chatCompletionFn: chat,
+    });
+
+    expect(result.status).toBe('completed');
+    expect(capturedParams.length).toBeGreaterThan(0);
+    for (const params of capturedParams) {
+      expect(params.maxTokens).toBe(DEFAULT_MAX_TOKENS);
+    }
+  });
+
+  it('passes a custom maxTokens override to every chat call when provided', async () => {
+    const capturedParams: ChatCompletionParams[] = [];
+    const chat = scriptedChat(
+      [
+        {
+          toolCalls: [
+            { name: 'finish_stage', args: { gateSummary: 'Done. Verify: nothing to check.' } },
+          ],
+          totalTokens: 30,
+        },
+      ],
+      (params) => capturedParams.push(params)
+    );
+
+    const result = await runAgentLoop({
+      workspaceRoot,
+      stage: '01_research',
+      apiKey: 'test-key',
+      chatCompletionFn: chat,
+      maxTokens: 1000,
+    });
+
+    expect(result.status).toBe('completed');
+    expect(capturedParams.length).toBeGreaterThan(0);
+    for (const params of capturedParams) {
+      expect(params.maxTokens).toBe(1000);
+    }
   });
 
   it('aborts cleanly when the token budget is exceeded', async () => {
