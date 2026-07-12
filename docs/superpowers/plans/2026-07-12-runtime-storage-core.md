@@ -19,6 +19,7 @@
 - "OpenRouter as the single model gateway (one env var per deploy for the key)." (§5)
 - "Model pinned per workspace, recorded in run metadata for reproducibility." (§5) — this sub-project records the model in the run log; per-workspace *configuration* of the model is deferred to the model-gateway sub-project (see design doc §"Decisions to pin during planning").
 - Per the design doc: MinIO/S3 sync, multi-model config, and the outbound network allowlist are explicitly out of scope for this plan.
+- **`contracts/` is frozen and authoritative for the on-disk file shapes and CLI behavior a parallel web-backend worktree depends on.** Read-only for this plan: if an implementation choice here doesn't fit a contract, stop and ask — never edit `contracts/`. Where a schema in `contracts/schemas/` and this plan disagree, the schema wins. Two amendments were required (see `contracts/README.md` "Required runner amendments") and are folded into Tasks 3 and 11 below: a `stage` field on `LockInfo`, and stage-ordering enforcement with a `--force` bypass in `runner run`.
 
 All file paths below are relative to the repo root unless stated otherwise.
 
@@ -281,15 +282,19 @@ git commit -m "runner: add filesystem jail"
 
 ### Task 3: Lock file
 
+> **Amended (contract-driven):** `contracts/schemas/lock.schema.json` requires a `stage`
+> field on `LockInfo` so a UI can tell which stage is running (`contracts/README.md`
+> "Required runner amendments" #1). `acquireLock` now takes `stage` and writes it.
+
 **Files:**
 - Create: `platform/runner/src/lock.ts`
 - Test: `platform/runner/test/lock.test.ts`
 
 **Interfaces:**
-- Produces: `acquireLock(workspaceRoot: string, runId: string): void` — throws `LockHeldError` if already locked.
+- Produces: `acquireLock(workspaceRoot: string, runId: string, stage: string): void` — throws `LockHeldError` if already locked.
 - Produces: `releaseLock(workspaceRoot: string): void` — no-op if not locked.
 - Produces: `readLock(workspaceRoot: string): LockInfo | null`.
-- Produces: `interface LockInfo { runId: string; pid: number; acquiredAt: string }`.
+- Produces: `interface LockInfo { runId: string; stage: string; pid: number; acquiredAt: string }` (matches `contracts/schemas/lock.schema.json` exactly — `additionalProperties: false` there, so do not add fields beyond these four).
 - Produces: `class LockHeldError extends Error { holder: LockInfo }`.
 - Consumed by: Task 11 (`commands/run.ts`).
 
@@ -314,33 +319,35 @@ describe('lock', () => {
   });
 
   it('acquires a lock and records it', () => {
-    acquireLock(workspaceRoot, 'run-1');
+    acquireLock(workspaceRoot, 'run-1', '01_research');
     const lock = readLock(workspaceRoot);
     expect(lock?.runId).toBe('run-1');
+    expect(lock?.stage).toBe('01_research');
     expect(lock?.pid).toBe(process.pid);
   });
 
   it('rejects a second acquire while the first is held', () => {
-    acquireLock(workspaceRoot, 'run-1');
-    expect(() => acquireLock(workspaceRoot, 'run-2')).toThrow(LockHeldError);
+    acquireLock(workspaceRoot, 'run-1', '01_research');
+    expect(() => acquireLock(workspaceRoot, 'run-2', '02_analysis')).toThrow(LockHeldError);
   });
 
-  it('reports the holder on LockHeldError', () => {
-    acquireLock(workspaceRoot, 'run-1');
+  it('reports the holder (including stage) on LockHeldError', () => {
+    acquireLock(workspaceRoot, 'run-1', '01_research');
     try {
-      acquireLock(workspaceRoot, 'run-2');
+      acquireLock(workspaceRoot, 'run-2', '02_analysis');
       throw new Error('expected LockHeldError');
     } catch (err) {
       expect(err).toBeInstanceOf(LockHeldError);
       expect((err as LockHeldError).holder.runId).toBe('run-1');
+      expect((err as LockHeldError).holder.stage).toBe('01_research');
     }
   });
 
   it('allows re-acquiring after release', () => {
-    acquireLock(workspaceRoot, 'run-1');
+    acquireLock(workspaceRoot, 'run-1', '01_research');
     releaseLock(workspaceRoot);
     expect(readLock(workspaceRoot)).toBeNull();
-    acquireLock(workspaceRoot, 'run-2');
+    acquireLock(workspaceRoot, 'run-2', '02_analysis');
     expect(readLock(workspaceRoot)?.runId).toBe('run-2');
   });
 
@@ -365,13 +372,16 @@ import { join } from 'node:path';
 
 export interface LockInfo {
   runId: string;
+  stage: string;
   pid: number;
   acquiredAt: string;
 }
 
 export class LockHeldError extends Error {
   constructor(public readonly holder: LockInfo) {
-    super(`Workspace is locked by run ${holder.runId} (pid ${holder.pid}) since ${holder.acquiredAt}`);
+    super(
+      `Workspace is locked by run ${holder.runId} (stage ${holder.stage}, pid ${holder.pid}) since ${holder.acquiredAt}`
+    );
     this.name = 'LockHeldError';
   }
 }
@@ -380,13 +390,13 @@ function lockPath(workspaceRoot: string): string {
   return join(workspaceRoot, '.runner.lock');
 }
 
-export function acquireLock(workspaceRoot: string, runId: string): void {
+export function acquireLock(workspaceRoot: string, runId: string, stage: string): void {
   const path = lockPath(workspaceRoot);
   if (existsSync(path)) {
     const holder = JSON.parse(readFileSync(path, 'utf-8')) as LockInfo;
     throw new LockHeldError(holder);
   }
-  const info: LockInfo = { runId, pid: process.pid, acquiredAt: new Date().toISOString() };
+  const info: LockInfo = { runId, stage, pid: process.pid, acquiredAt: new Date().toISOString() };
   mkdirSync(workspaceRoot, { recursive: true });
   writeFileSync(path, JSON.stringify(info, null, 2));
 }
@@ -699,7 +709,7 @@ git commit -m "runner: add structured run log"
 - Produces: `readState(workspaceRoot: string): WorkspaceState`.
 - Produces: `writeState(workspaceRoot: string, state: WorkspaceState): void`.
 - Produces: `updateStageState(workspaceRoot: string, stage: string, patch: Partial<Omit<StageState, 'updatedAt'>>): WorkspaceState`.
-- Consumed by: Task 11 (`commands/run.ts`, `commands/status.ts`, `commands/approve.ts`, `commands/reject.ts`).
+- Consumed by: Task 11 (`commands/run.ts`, `commands/status.ts`, `commands/approve.ts`, `commands/reject.ts`, `stageOrder.ts`).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1665,37 +1675,151 @@ git commit -m "runner: add OpenRouter tool-calling agent loop"
 
 ### Task 11: CLI (run, status, approve, reject)
 
+> **Amended (contract-driven):** `contracts/state-machine.md` "Stage-ordering policy"
+> requires `runner run <stage>` to refuse running a stage unless every lower-numbered
+> stage is `approved`, with a `--force` bypass (`contracts/README.md` "Required runner
+> amendments" #2). This adds a new `stageOrder.ts` module and wires it into
+> `commands/run.ts` and `cli.ts` below. `acquireLock` is now called with 3 args (`stage`
+> included) per the Task 3 amendment.
+
 **Files:**
+- Create: `platform/runner/src/stageOrder.ts`
 - Create: `platform/runner/src/commands/run.ts`
 - Create: `platform/runner/src/commands/status.ts`
 - Create: `platform/runner/src/commands/approve.ts`
 - Create: `platform/runner/src/commands/reject.ts`
 - Create: `platform/runner/src/cli.ts`
+- Test: `platform/runner/test/stageOrder.test.ts`
 - Test: `platform/runner/test/commands.test.ts`
 
 **Interfaces:**
-- Consumes: `acquireLock`, `releaseLock` from `../lock.js` (Task 3); `runAgentLoop` from `../agentLoop.js` (Task 10); `ChatCompletionFn` from `../openrouter.js` (Task 8); `writeRunLog`, `readLatestRunLog` from `../runLog.js` (Task 5); `commitWorkspace` from `../git.js` (Task 7); `readState`, `updateStageState` from `../state.js` (Task 6).
-- Produces: `interface RunCommandDeps { chatCompletionFn?: ChatCompletionFn }`.
-- Produces: `runCommand(workspaceRoot: string, stage: string, deps?: RunCommandDeps): Promise<void>`.
+- Consumes: `acquireLock` (now 3-arg: `workspaceRoot, runId, stage`), `releaseLock` from `../lock.js` (Task 3, amended); `runAgentLoop` from `../agentLoop.js` (Task 10); `ChatCompletionFn` from `../openrouter.js` (Task 8); `writeRunLog`, `readLatestRunLog` from `../runLog.js` (Task 5); `commitWorkspace` from `../git.js` (Task 7); `readState`, `updateStageState` from `../state.js` (Task 6).
+- Produces: `interface StageBlock { blockingStage: string; blockingStatus: string }`.
+- Produces: `discoverStages(workspaceRoot: string): string[]` — directory names under `stages/` matching `^[0-9]{2}_`, lexically sorted (equivalent to numeric order given this repo's fixed 2-digit prefix convention), per `contracts/state-machine.md` "Stage discovery".
+- Produces: `checkStageOrder(workspaceRoot: string, stage: string): StageBlock | null` — the first lower-numbered stage that is not `approved`, or `null` if none block.
+- Produces: `class StageOrderBlockedError extends Error { blockingStage: string; blockingStatus: string }` — message is exactly `` `Blocked: ${blockingStage} is ${blockingStatus}, must be approved first.` `` per the contract.
+- Produces: `interface RunCommandDeps { chatCompletionFn?: ChatCompletionFn; force?: boolean }`.
+- Produces: `runCommand(workspaceRoot: string, stage: string, deps?: RunCommandDeps): Promise<void>` — throws `StageOrderBlockedError` before acquiring the lock if stage ordering is violated and `deps.force` is not `true`.
 - Produces: `statusCommand(workspaceRoot: string): void`.
 - Produces: `approveCommand(workspaceRoot: string, stage: string): void`.
 - Produces: `rejectCommand(workspaceRoot: string, stage: string, comment: string): void`.
-- Produces: CLI entrypoint `src/cli.ts` wiring `runner run|status|approve|reject` with a `--workspace <path>` flag (defaults to `process.cwd()`) and `--comment "<text>"` for `reject`.
+- Produces: CLI entrypoint `src/cli.ts` wiring `runner run|status|approve|reject` with a `--workspace <path>` flag (defaults to `process.cwd()`), `--force` for `run`, and `--comment "<text>"` for `reject`.
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Write the failing tests for `stageOrder.ts`**
+
+```typescript
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { discoverStages, checkStageOrder } from '../src/stageOrder.js';
+import { updateStageState } from '../src/state.js';
+
+describe('stageOrder', () => {
+  let workspaceRoot: string;
+
+  beforeEach(() => {
+    workspaceRoot = mkdtempSync(join(tmpdir(), 'stage-order-'));
+    mkdirSync(join(workspaceRoot, 'stages', '01_research'), { recursive: true });
+    mkdirSync(join(workspaceRoot, 'stages', '02_analysis'), { recursive: true });
+    mkdirSync(join(workspaceRoot, 'stages', '03_report'), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('discovers stage directories in numeric order', () => {
+    expect(discoverStages(workspaceRoot)).toEqual(['01_research', '02_analysis', '03_report']);
+  });
+
+  it('does not block the first stage', () => {
+    expect(checkStageOrder(workspaceRoot, '01_research')).toBeNull();
+  });
+
+  it('blocks a later stage when an earlier one is pending', () => {
+    expect(checkStageOrder(workspaceRoot, '02_analysis')).toEqual({
+      blockingStage: '01_research',
+      blockingStatus: 'pending',
+    });
+  });
+
+  it('does not block once the earlier stage is approved', () => {
+    updateStageState(workspaceRoot, '01_research', { status: 'approved' });
+    expect(checkStageOrder(workspaceRoot, '02_analysis')).toBeNull();
+  });
+
+  it('blocks on the first unapproved stage, even if a later one is further along', () => {
+    updateStageState(workspaceRoot, '01_research', { status: 'approved' });
+    updateStageState(workspaceRoot, '02_analysis', { status: 'awaiting_review' });
+    expect(checkStageOrder(workspaceRoot, '03_report')).toEqual({
+      blockingStage: '02_analysis',
+      blockingStatus: 'awaiting_review',
+    });
+  });
+});
+```
+
+Save as `platform/runner/test/stageOrder.test.ts`.
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd platform/runner && npx vitest run test/stageOrder.test.ts`
+Expected: FAIL — `Cannot find module '../src/stageOrder.js'`.
+
+- [ ] **Step 3: Implement `stageOrder.ts`**
+
+```typescript
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { readState } from './state.js';
+
+export interface StageBlock {
+  blockingStage: string;
+  blockingStatus: string;
+}
+
+export function discoverStages(workspaceRoot: string): string[] {
+  return readdirSync(join(workspaceRoot, 'stages'), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && /^[0-9]{2}_/.test(entry.name))
+    .map((entry) => entry.name)
+    .sort();
+}
+
+export function checkStageOrder(workspaceRoot: string, stage: string): StageBlock | null {
+  const state = readState(workspaceRoot);
+  for (const candidate of discoverStages(workspaceRoot)) {
+    if (candidate >= stage) break;
+    const status = state.stages[candidate]?.status ?? 'pending';
+    if (status !== 'approved') {
+      return { blockingStage: candidate, blockingStatus: status };
+    }
+  }
+  return null;
+}
+```
+
+Save as `platform/runner/src/stageOrder.ts`.
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `cd platform/runner && npx vitest run test/stageOrder.test.ts`
+Expected: PASS — 5 tests passed.
+
+- [ ] **Step 5: Write the failing tests for the CLI commands**
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, cpSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, cpSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runCommand } from '../src/commands/run.js';
+import { runCommand, StageOrderBlockedError } from '../src/commands/run.js';
 import { statusCommand } from '../src/commands/status.js';
 import { approveCommand } from '../src/commands/approve.js';
 import { rejectCommand } from '../src/commands/reject.js';
-import { readState } from '../src/state.js';
+import { readState, updateStageState } from '../src/state.js';
 import type { ChatCompletionFn, ChatCompletionResult } from '../src/openrouter.js';
 
 const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/workspace', import.meta.url));
@@ -1730,6 +1854,7 @@ describe('CLI commands', () => {
   beforeEach(() => {
     workspaceRoot = mkdtempSync(join(tmpdir(), 'commands-'));
     cpSync(FIXTURE_DIR, workspaceRoot, { recursive: true });
+    mkdirSync(join(workspaceRoot, 'stages', '02_analysis'), { recursive: true });
     execFileSync('git', ['init'], { cwd: workspaceRoot });
     execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: workspaceRoot });
     execFileSync('git', ['config', 'user.name', 'Test'], { cwd: workspaceRoot });
@@ -1762,6 +1887,41 @@ describe('CLI commands', () => {
     expect(existsSync(join(workspaceRoot, 'stages/01_research/output/findings.md'))).toBe(true);
   });
 
+  it('runCommand refuses to run a later stage when an earlier stage is not approved', async () => {
+    const chat = scriptedChat([]);
+    let caught: unknown;
+    try {
+      await runCommand(workspaceRoot, '02_analysis', { chatCompletionFn: chat });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(StageOrderBlockedError);
+    expect((caught as Error).message).toBe('Blocked: 01_research is pending, must be approved first.');
+  });
+
+  it('runCommand --force bypasses stage ordering', async () => {
+    const chat = scriptedChat([
+      { toolCalls: [{ name: 'finish_stage', args: { gateSummary: 'Done. Verify: ok.' } }], totalTokens: 10 },
+    ]);
+
+    await runCommand(workspaceRoot, '02_analysis', { chatCompletionFn: chat, force: true });
+
+    const state = readState(workspaceRoot);
+    expect(state.stages['02_analysis'].status).toBe('awaiting_review');
+  });
+
+  it('runCommand proceeds once the earlier stage is approved', async () => {
+    updateStageState(workspaceRoot, '01_research', { status: 'approved' });
+    const chat = scriptedChat([
+      { toolCalls: [{ name: 'finish_stage', args: { gateSummary: 'Done. Verify: ok.' } }], totalTokens: 10 },
+    ]);
+
+    await runCommand(workspaceRoot, '02_analysis', { chatCompletionFn: chat });
+
+    const state = readState(workspaceRoot);
+    expect(state.stages['02_analysis'].status).toBe('awaiting_review');
+  });
+
   it('approveCommand marks a stage approved and commits', () => {
     approveCommand(workspaceRoot, '01_research');
     const state = readState(workspaceRoot);
@@ -1783,12 +1943,12 @@ describe('CLI commands', () => {
 
 Save as `platform/runner/test/commands.test.ts`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **Step 6: Run tests to verify they fail**
 
 Run: `cd platform/runner && npx vitest run test/commands.test.ts`
 Expected: FAIL — `Cannot find module '../src/commands/run.js'`.
 
-- [ ] **Step 3: Implement `commands/run.ts`**
+- [ ] **Step 7: Implement `commands/run.ts`**
 
 ```typescript
 import { randomUUID } from 'node:crypto';
@@ -1798,9 +1958,18 @@ import type { ChatCompletionFn } from '../openrouter.js';
 import { writeRunLog } from '../runLog.js';
 import { commitWorkspace } from '../git.js';
 import { updateStageState } from '../state.js';
+import { checkStageOrder } from '../stageOrder.js';
 
 export interface RunCommandDeps {
   chatCompletionFn?: ChatCompletionFn;
+  force?: boolean;
+}
+
+export class StageOrderBlockedError extends Error {
+  constructor(public readonly blockingStage: string, public readonly blockingStatus: string) {
+    super(`Blocked: ${blockingStage} is ${blockingStatus}, must be approved first.`);
+    this.name = 'StageOrderBlockedError';
+  }
 }
 
 export async function runCommand(workspaceRoot: string, stage: string, deps: RunCommandDeps = {}): Promise<void> {
@@ -1809,8 +1978,15 @@ export async function runCommand(workspaceRoot: string, stage: string, deps: Run
     throw new Error('OPENROUTER_API_KEY is not set');
   }
 
+  if (!deps.force) {
+    const block = checkStageOrder(workspaceRoot, stage);
+    if (block) {
+      throw new StageOrderBlockedError(block.blockingStage, block.blockingStatus);
+    }
+  }
+
   const runId = randomUUID();
-  acquireLock(workspaceRoot, runId);
+  acquireLock(workspaceRoot, runId, stage);
   const startedAt = new Date().toISOString();
 
   try {
@@ -1860,7 +2036,7 @@ export async function runCommand(workspaceRoot: string, stage: string, deps: Run
 
 Save as `platform/runner/src/commands/run.ts`.
 
-- [ ] **Step 4: Implement `commands/status.ts`**
+- [ ] **Step 8: Implement `commands/status.ts`**
 
 ```typescript
 import { readState } from '../state.js';
@@ -1889,7 +2065,7 @@ export function statusCommand(workspaceRoot: string): void {
 
 Save as `platform/runner/src/commands/status.ts`.
 
-- [ ] **Step 5: Implement `commands/approve.ts` and `commands/reject.ts`**
+- [ ] **Step 9: Implement `commands/approve.ts` and `commands/reject.ts`**
 
 ```typescript
 import { commitWorkspace } from '../git.js';
@@ -1915,12 +2091,12 @@ export function rejectCommand(workspaceRoot: string, stage: string, comment: str
 
 Save as `platform/runner/src/commands/reject.ts`.
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [ ] **Step 10: Run tests to verify they pass**
 
 Run: `cd platform/runner && npx vitest run test/commands.test.ts`
-Expected: PASS — 4 tests passed.
+Expected: PASS — 7 tests passed.
 
-- [ ] **Step 7: Implement the CLI entrypoint `cli.ts`**
+- [ ] **Step 11: Implement the CLI entrypoint `cli.ts`**
 
 ```typescript
 #!/usr/bin/env node
@@ -1933,7 +2109,7 @@ function usage(): never {
   console.error(
     [
       'Usage:',
-      '  runner run <stage> [--workspace <path>]',
+      '  runner run <stage> [--workspace <path>] [--force]',
       '  runner status [--workspace <path>]',
       '  runner approve <stage> [--workspace <path>]',
       '  runner reject <stage> --comment "<text>" [--workspace <path>]',
@@ -1953,6 +2129,15 @@ function parseWorkspaceFlag(args: string[]): { workspaceRoot: string; rest: stri
   return { workspaceRoot, rest };
 }
 
+function parseForceFlag(args: string[]): { force: boolean; rest: string[] } {
+  const idx = args.indexOf('--force');
+  if (idx === -1) {
+    return { force: false, rest: args };
+  }
+  const rest = [...args.slice(0, idx), ...args.slice(idx + 1)];
+  return { force: true, rest };
+}
+
 function parseCommentFlag(args: string[]): { comment: string; rest: string[] } {
   const idx = args.indexOf('--comment');
   if (idx === -1 || !args[idx + 1]) usage();
@@ -1967,9 +2152,10 @@ async function main(): Promise<void> {
 
   switch (command) {
     case 'run': {
-      const [stage] = rest;
+      const { force, rest: rest2 } = parseForceFlag(rest);
+      const [stage] = rest2;
       if (!stage) usage();
-      await runCommand(workspaceRoot, stage);
+      await runCommand(workspaceRoot, stage, { force });
       break;
     }
     case 'status': {
@@ -2002,12 +2188,12 @@ main().catch((err) => {
 
 Save as `platform/runner/src/cli.ts`.
 
-- [ ] **Step 8: Run the full test suite and typecheck**
+- [ ] **Step 12: Run the full test suite and typecheck**
 
 Run: `cd platform/runner && npm run typecheck && npm test`
-Expected: typecheck passes; all test files pass (should be ~28 tests total across Tasks 1-11).
+Expected: typecheck passes; all test files pass (should be ~40 tests total across Tasks 1-11).
 
-- [ ] **Step 9: Manually verify the CLI wires together**
+- [ ] **Step 13: Manually verify the CLI wires together**
 
 Run:
 ```bash
@@ -2016,11 +2202,11 @@ npx tsx src/cli.ts status --workspace ./test/fixtures/workspace
 ```
 Expected: prints `No runs recorded yet.` (no crash, confirms `cli.ts` → `statusCommand` wiring works end to end).
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 14: Commit**
 
 ```bash
-git add platform/runner/src/commands platform/runner/src/cli.ts platform/runner/test/commands.test.ts
-git commit -m "runner: add CLI (run/status/approve/reject)"
+git add platform/runner/src/stageOrder.ts platform/runner/src/commands platform/runner/src/cli.ts platform/runner/test/stageOrder.test.ts platform/runner/test/commands.test.ts
+git commit -m "runner: add CLI (run/status/approve/reject) with stage-ordering enforcement"
 ```
 
 ---
