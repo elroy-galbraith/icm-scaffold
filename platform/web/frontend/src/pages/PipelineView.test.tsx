@@ -1,13 +1,24 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PipelineView } from './PipelineView.js';
-import { getPipeline, type Pipeline } from '../api/client.js';
+import { getPipeline, runStage, type Pipeline } from '../api/client.js';
 
 vi.mock('../api/client.js', async () => {
   const actual = await vi.importActual<typeof import('../api/client.js')>('../api/client.js');
   return { ...actual, getPipeline: vi.fn(), runStage: vi.fn(), approveStage: vi.fn(), rejectStage: vi.fn() };
 });
+
+/** Resolves/rejects on demand, so a test can hold a mutation "in flight" indefinitely. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 function renderWithClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -68,5 +79,52 @@ describe('PipelineView', () => {
     vi.mocked(getPipeline).mockRejectedValue(new Error('network down'));
     renderWithClient(<PipelineView />);
     await waitFor(() => expect(screen.getByTestId('pipeline-error')).toBeInTheDocument());
+  });
+
+  it('tracks Run-pending state per stage, so clicking Run on a second stage does not clear the first stage\'s pending state', async () => {
+    // Regression test for: PipelineView used to derive each StageCard's isRunPending from
+    // `runMutation.isPending && runMutation.variables === stage.name`. Since runMutation is a
+    // single shared mutation object reused across every stage, `.variables` only ever reflects
+    // the MOST RECENT `.mutate()` call — so starting stage B's run wiped out stage A's pending
+    // flag even though A's request was still outstanding, reopening the double-submit hole.
+    const runA = deferred<void>();
+    const runB = deferred<void>();
+    vi.mocked(runStage).mockImplementation((stage: string) => {
+      if (stage === '01_research') return runA.promise;
+      if (stage === '02_analysis') return runB.promise;
+      return Promise.resolve();
+    });
+    vi.mocked(getPipeline).mockResolvedValue(BASE_PIPELINE);
+
+    renderWithClient(<PipelineView />);
+    await waitFor(() => expect(screen.getByTestId('stagecard-run-01_research')).toBeInTheDocument());
+
+    // Click Run on stage A (01_research); its request is left unresolved.
+    fireEvent.click(screen.getByTestId('stagecard-run-01_research'));
+    await waitFor(() => expect(screen.getByTestId('stagecard-run-01_research')).toBeDisabled());
+
+    // While A is still in flight, click Run on stage B (02_analysis), also unresolved.
+    fireEvent.click(screen.getByTestId('stagecard-run-02_analysis'));
+    await waitFor(() => expect(screen.getByTestId('stagecard-run-02_analysis')).toBeDisabled());
+
+    // Both must be disabled simultaneously — this is the exact case the old
+    // `mutation.variables`-based scoping got wrong (B's click used to re-enable A).
+    expect(screen.getByTestId('stagecard-run-01_research')).toBeDisabled();
+    expect(screen.getByTestId('stagecard-run-02_analysis')).toBeDisabled();
+
+    // Resolving A's request re-enables A's button while B's stays disabled, proving the
+    // pending state is tracked independently per stage rather than as one shared flag.
+    await act(async () => {
+      runA.resolve();
+      await runA.promise;
+    });
+    await waitFor(() => expect(screen.getByTestId('stagecard-run-01_research')).not.toBeDisabled());
+    expect(screen.getByTestId('stagecard-run-02_analysis')).toBeDisabled();
+
+    // Clean up the still-pending B request so it doesn't leak into other tests.
+    await act(async () => {
+      runB.resolve();
+      await runB.promise;
+    });
   });
 });
