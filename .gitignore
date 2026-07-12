@@ -10,3 +10,10 @@ platform/runner/dist/
 platform/runner/.env
 .runner.lock
 .runner/
+
+platform/web/mock-server/node_modules/
+platform/web/mock-server/dist/
+platform/web/frontend/node_modules/
+platform/web/frontend/dist/
+platform/web/frontend/playwright-report/
+platform/web/frontend/test-results/
