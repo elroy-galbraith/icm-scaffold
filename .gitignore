@@ -7,5 +7,6 @@ stages/*/output/*
 
 platform/runner/node_modules/
 platform/runner/dist/
+platform/runner/.env
 .runner.lock
 .runner/
