@@ -10,3 +10,6 @@ platform/runner/dist/
 platform/runner/.env
 .runner.lock
 .runner/
+
+# Session scratch (subagent-driven-development task briefs/reports/ledger)
+.superpowers/
