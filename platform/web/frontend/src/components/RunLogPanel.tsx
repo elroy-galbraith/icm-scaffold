@@ -6,7 +6,7 @@ export interface RunLogPanelProps {
 
 /** Safely reads the `path` arg from a tool call, when present (read_file, write_file, list_dir). */
 function toolCallPath(call: ToolCallLogEntry): string | undefined {
-  const path = call.args.path;
+  const path = call.args?.path;
   return typeof path === 'string' ? path : undefined;
 }
 

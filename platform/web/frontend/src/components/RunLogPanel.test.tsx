@@ -86,4 +86,18 @@ describe('RunLogPanel', () => {
     expect(screen.getByTestId('run-log-error')).toHaveTextContent('Too many consecutive tool errors');
     expect(screen.queryByTestId('run-log-gate-summary')).not.toBeInTheDocument();
   });
+
+  it('does not crash when a tool call has no args (malformed/hand-edited run log)', () => {
+    // `args` is required by the type/schema, but the frontend doesn't runtime-validate
+    // getRun()'s response — a hand-edited .runner/runs/<id>.json, or a future real
+    // backend that isn't byte-for-byte contract-compliant, could omit it.
+    const logWithMissingArgs: RunLog = {
+      ...COMPLETED_LOG,
+      toolCalls: [
+        { ...COMPLETED_LOG.toolCalls[0], args: undefined as unknown as Record<string, unknown> },
+      ],
+    };
+    expect(() => render(<RunLogPanel runLog={logWithMissingArgs} />)).not.toThrow();
+    expect(screen.getByTestId('run-log-tool-call-0')).toHaveTextContent('read_file');
+  });
 });
