@@ -36,3 +36,20 @@ through three stages: research → analysis → report.
 If `shared/client-brief.md` still contains placeholder text, offer to run setup:
 walk the user through `setup/questionnaire.md` and write their answers into
 `shared/client-brief.md` and `_config/voice.md` before running any stage.
+
+## Worktree identity: web UI sub-project (Layer 0 override)
+
+This worktree (`worktree-icm-web`) is **not** doing ICM report-pipeline work. It builds
+the web UI product described in `docs/mvp-spec.md` §4, per:
+
+- **Design:** `docs/superpowers/specs/2026-07-12-web-ui-design.md`
+- **Plan:** `docs/superpowers/plans/2026-07-12-web-ui.md` — execute task-by-task via
+  `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
+- **Scope:** `platform/web/frontend/` (React+Vite+TS SPA) and
+  `platform/web/mock-server/` (Node+Express+TS mock of `contracts/openapi.yaml`,
+  seeded from `examples/meridian-support-automation`).
+
+**Read `contracts/` first. It is frozen and read-only for this worktree.** If an
+implementation choice here doesn't fit a contract, STOP and ask — never modify
+`contracts/` to fit the code. Do not import code from `platform/runner/`; the only
+shared interface between worktrees is `contracts/`.
