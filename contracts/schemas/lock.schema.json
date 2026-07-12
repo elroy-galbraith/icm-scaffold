@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "icm/lock",
+  "title": "LockInfo",
+  "description": "Contents of <workspace>/.runner.lock. Present iff a run is in progress. NOTE: `stage` is a contract-required amendment to the runner plan (see contracts/README.md) — the original plan omitted it.",
+  "type": "object",
+  "required": ["runId", "stage", "pid", "acquiredAt"],
+  "additionalProperties": false,
+  "properties": {
+    "runId": { "type": "string", "description": "UUID of the in-progress run" },
+    "stage": { "type": "string", "description": "Stage being run, e.g. \"01_research\"" },
+    "pid": { "type": "integer" },
+    "acquiredAt": { "type": "string", "format": "date-time" }
+  }
+}

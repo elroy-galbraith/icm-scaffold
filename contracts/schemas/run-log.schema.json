@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "icm/run-log",
+  "title": "RunLog",
+  "description": "Contents of <workspace>/.runner/runs/<runId>.json. One file per finished run; a run in progress has no file yet. Written only by the runner CLI.",
+  "type": "object",
+  "required": [
+    "runId", "stage", "model", "startedAt", "endedAt", "status",
+    "filesRead", "filesWritten", "toolCalls", "tokensSpent", "tokenBudget"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "runId": { "type": "string", "description": "UUID" },
+    "stage": { "type": "string", "description": "Stage directory name, e.g. \"01_research\"" },
+    "model": { "type": "string", "description": "OpenRouter model slug, e.g. \"anthropic/claude-sonnet-5\"" },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "endedAt": { "type": "string", "format": "date-time" },
+    "status": { "enum": ["completed", "aborted_budget", "error"] },
+    "filesRead": { "type": "array", "items": { "type": "string" }, "description": "Workspace-relative paths" },
+    "filesWritten": { "type": "array", "items": { "type": "string" }, "description": "Workspace-relative paths" },
+    "toolCalls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tool", "args", "result", "timestamp"],
+        "additionalProperties": false,
+        "properties": {
+          "tool": { "enum": ["read_file", "write_file", "list_dir", "finish_stage"] },
+          "args": { "type": "object" },
+          "result": { "enum": ["ok", "error"] },
+          "errorMessage": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "tokensSpent": { "type": "integer", "minimum": 0 },
+    "tokenBudget": { "type": "integer", "minimum": 0 },
+    "gateSummary": { "type": "string", "description": "Model-written summary + Verify checklist shown to the reviewer" },
+    "errorMessage": { "type": "string" }
+  }
+}

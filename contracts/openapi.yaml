@@ -1,0 +1,253 @@
+openapi: 3.1.0
+info:
+  title: ICM Web Backend API
+  version: 0.1.0
+  description: >
+    Thin HTTP layer over the runner CLI and the workspace volume. Single-workspace
+    for MVP (workspace path is deploy config, not a request parameter). Reads come
+    from .runner/ files and the workspace; all state mutations shell out to the
+    runner CLI. Auth: none in MVP mocks; a session cookie is added when the auth
+    slice lands — no endpoint shapes change.
+    UI worktree: generate a mock server from this file, use the Meridian example
+    workspace as fixture data.
+
+paths:
+  /api/pipeline:
+    get:
+      summary: Full pipeline view (the main UI poll — includes derived running state)
+      operationId: getPipeline
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pipeline" }
+
+  /api/stages/{stage}/run:
+    post:
+      summary: Run a stage (fails 409 if locked, 422 if blocked by stage ordering)
+      operationId: runStage
+      parameters: [{ $ref: "#/components/parameters/Stage" }]
+      responses:
+        "202": { description: "Run started; poll /api/pipeline" }
+        "409": { $ref: "#/components/responses/Locked" }
+        "422": { $ref: "#/components/responses/Blocked" }
+
+  /api/stages/{stage}/approve:
+    post:
+      summary: Approve a stage awaiting review
+      operationId: approveStage
+      parameters: [{ $ref: "#/components/parameters/Stage" }]
+      responses:
+        "200": { description: "Approved; state committed" }
+        "409": { description: "Stage not awaiting_review" }
+
+  /api/stages/{stage}/reject:
+    post:
+      summary: Reject a stage awaiting review, with a required comment
+      operationId: rejectStage
+      parameters: [{ $ref: "#/components/parameters/Stage" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment]
+              properties:
+                comment: { type: string, minLength: 1 }
+      responses:
+        "200": { description: "Rejected; comment stored" }
+        "409": { description: "Stage not awaiting_review" }
+
+  /api/runs/{runId}:
+    get:
+      summary: Full run log (schema = contracts/schemas/run-log.schema.json)
+      operationId: getRun
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RunLog" }
+        "404": { description: "Unknown run" }
+
+  /api/files:
+    get:
+      summary: Read a workspace file (UTF-8 text only in MVP)
+      operationId: readFile
+      parameters: [{ $ref: "#/components/parameters/Path" }]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [path, content]
+                properties:
+                  path: { type: string }
+                  content: { type: string }
+        "403": { description: "Path escapes workspace (jail rules apply here too)" }
+        "404": { description: "Not found" }
+    put:
+      summary: Write a workspace file (human edit — backend git-commits as "human edit")
+      operationId: writeFile
+      parameters: [{ $ref: "#/components/parameters/Path" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+      responses:
+        "200": { description: "Written and committed" }
+        "403": { description: "Path escapes workspace, or targets .runner/ (read-only via API)" }
+        "409": { $ref: "#/components/responses/Locked" }
+
+  /api/tree:
+    get:
+      summary: Workspace file tree (excludes .git and node_modules; includes .runner)
+      operationId: getTree
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TreeEntry" }
+
+  /api/diff:
+    get:
+      summary: Unified diff for a file against a git ref (default HEAD~1)
+      operationId: getDiff
+      parameters:
+        - $ref: "#/components/parameters/Path"
+        - name: ref
+          in: query
+          schema: { type: string, default: "HEAD~1" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [path, ref, diff]
+                properties:
+                  path: { type: string }
+                  ref: { type: string }
+                  diff: { type: string, description: "Unified diff, empty if no change" }
+
+  /api/log:
+    get:
+      summary: Git log of the workspace (the audit trail)
+      operationId: getLog
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [sha, message, date]
+                  properties:
+                    sha: { type: string }
+                    message: { type: string }
+                    date: { type: string, format: date-time }
+
+components:
+  parameters:
+    Stage:
+      name: stage
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[0-9]{2}_[a-z0-9_]+$" }
+    Path:
+      name: path
+      in: query
+      required: true
+      schema: { type: string, description: "Workspace-relative path" }
+
+  responses:
+    Locked:
+      description: A run is in progress (one run at a time per workspace)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              runId: { type: string }
+              stage: { type: string }
+              acquiredAt: { type: string, format: date-time }
+    Blocked:
+      description: Stage ordering violated
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              blockingStage: { type: string }
+              blockingStatus: { type: string }
+
+  schemas:
+    Pipeline:
+      type: object
+      required: [stages, locked]
+      properties:
+        locked:
+          type: boolean
+          description: True iff .runner.lock exists (disable all run buttons)
+        lock:
+          type: object
+          nullable: true
+          description: Contents of .runner.lock when locked (schema = contracts/schemas/lock.schema.json)
+        stages:
+          type: array
+          description: Ordered by numeric prefix, discovered from stages/NN_* directories
+          items:
+            type: object
+            required: [name, status, running]
+            properties:
+              name: { type: string }
+              status:
+                enum: [pending, awaiting_review, approved, rejected]
+                description: Stored status from state.json
+              running:
+                type: boolean
+                description: Derived — locked AND lock.stage == name
+              comment: { type: string, nullable: true }
+              lastRun:
+                type: object
+                nullable: true
+                description: >
+                  Summary of the run referenced by lastRunId (the failure-join rule
+                  from contracts/state-machine.md, pre-joined by the backend)
+                properties:
+                  runId: { type: string }
+                  status: { enum: [completed, aborted_budget, error] }
+                  endedAt: { type: string, format: date-time }
+                  tokensSpent: { type: integer }
+                  tokenBudget: { type: integer }
+                  gateSummary: { type: string, nullable: true }
+                  errorMessage: { type: string, nullable: true }
+
+    RunLog:
+      description: See contracts/schemas/run-log.schema.json (authoritative)
+      type: object
+
+    TreeEntry:
+      type: object
+      required: [path, type]
+      properties:
+        path: { type: string }
+        type: { enum: [file, dir] }

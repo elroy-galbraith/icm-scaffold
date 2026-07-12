@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "icm/workspace-state",
+  "title": "WorkspaceState",
+  "description": "Contents of <workspace>/.runner/state.json. Written only by the runner CLI.",
+  "type": "object",
+  "required": ["stages"],
+  "additionalProperties": false,
+  "properties": {
+    "stages": {
+      "type": "object",
+      "description": "Keyed by stage directory name, e.g. \"01_research\". A stage absent here is pending.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status", "updatedAt"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": ["pending", "awaiting_review", "approved", "rejected"],
+            "description": "Stored status only. \"running\" is derived from the lock file — see contracts/state-machine.md."
+          },
+          "lastRunId": { "type": "string" },
+          "comment": {
+            "type": "string",
+            "description": "Reviewer comment, set on rejection."
+          },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}
