@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PipelineView } from './PipelineView.js';
-import { getPipeline, runStage, getTree, getFile, putFile, type Pipeline } from '../api/client.js';
+import { getPipeline, runStage, getTree, getFile, putFile, getDiff, type Pipeline } from '../api/client.js';
 
 vi.mock('../api/client.js', async () => {
   const actual = await vi.importActual<typeof import('../api/client.js')>('../api/client.js');
@@ -19,6 +19,11 @@ vi.mock('../api/client.js', async () => {
     getTree: vi.fn().mockResolvedValue([]),
     getFile: vi.fn(),
     putFile: vi.fn(),
+    // Defaults to an empty diff so tests that select a file but don't care about the diff
+    // panel don't hit React Query's "Query data cannot be undefined" warning for the
+    // unmocked ['diff', path] query (diffQuery fetches whenever a file is selected). Tests
+    // that do care override this with their own vi.mocked(getDiff).mockResolvedValue(...).
+    getDiff: vi.fn().mockResolvedValue({ path: '', ref: 'HEAD~1', diff: '' }),
   };
 });
 
@@ -229,5 +234,24 @@ describe('PipelineView', () => {
     expect(screen.getByTestId('markdown-editor')).toBeInTheDocument();
     expect(screen.getByTestId('markdown-editor-textarea')).toHaveValue('Unsaved B edit.');
     expect(screen.queryByTestId('markdown-viewer')).not.toBeInTheDocument();
+  });
+
+  it('shows the diff for the selected file next to the viewer', async () => {
+    vi.mocked(getPipeline).mockResolvedValue(BASE_PIPELINE);
+    vi.mocked(getTree).mockResolvedValue([{ path: 'shared/client-brief.md', type: 'file' }]);
+    vi.mocked(getFile).mockResolvedValue({ path: 'shared/client-brief.md', content: '# Client Brief' });
+    vi.mocked(getDiff).mockResolvedValue({
+      path: 'shared/client-brief.md',
+      ref: 'HEAD~1',
+      diff: '@@ -1 +1 @@\n-Old\n+New',
+    });
+    renderWithClient(<PipelineView />);
+
+    await waitFor(() => expect(screen.getByTestId('file-tree-entry-shared/client-brief.md')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('file-tree-entry-shared/client-brief.md'));
+
+    await waitFor(() => expect(screen.getByTestId('diff-view')).toBeInTheDocument());
+    expect(getDiff).toHaveBeenCalledWith('shared/client-brief.md');
+    expect(screen.getAllByTestId('diff-line-added')[0]).toHaveTextContent('New');
   });
 });

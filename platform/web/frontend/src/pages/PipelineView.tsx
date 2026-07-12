@@ -8,11 +8,13 @@ import {
   getTree,
   getFile,
   putFile,
+  getDiff,
   type StageStatus,
 } from '../api/client.js';
 import { StageCard } from '../components/StageCard.js';
 import { MarkdownViewer } from '../components/MarkdownViewer.js';
 import { MarkdownEditor } from '../components/MarkdownEditor.js';
+import { DiffView } from '../components/DiffView.js';
 
 function addTo(set: Set<string>, name: string): Set<string> {
   const next = new Set(set);
@@ -56,6 +58,11 @@ export function PipelineView() {
   const fileQuery = useQuery({
     queryKey: ['file', selectedPath],
     queryFn: () => getFile(selectedPath as string),
+    enabled: selectedPath !== null,
+  });
+  const diffQuery = useQuery({
+    queryKey: ['diff', selectedPath],
+    queryFn: () => getDiff(selectedPath as string),
     enabled: selectedPath !== null,
   });
 
@@ -190,6 +197,7 @@ export function PipelineView() {
           ) : (
             <MarkdownViewer content={fileQuery.data.content} />
           )}
+          <DiffView diff={diffQuery.data?.diff ?? ''} path={selectedPath} />
         </section>
       )}
     </main>
