@@ -6,6 +6,7 @@ import { writeRunLog } from '../runLog.js';
 import { commitWorkspace } from '../git.js';
 import { updateStageState } from '../state.js';
 import { checkStageOrder } from '../stageOrder.js';
+import { loadConfig } from '../config.js';
 
 export interface RunCommandDeps {
   chatCompletionFn?: ChatCompletionFn;
@@ -25,6 +26,8 @@ export async function runCommand(workspaceRoot: string, stage: string, deps: Run
     throw new Error('OPENROUTER_API_KEY is not set');
   }
 
+  const config = loadConfig(workspaceRoot);
+
   if (!deps.force) {
     const block = checkStageOrder(workspaceRoot, stage);
     if (block) {
@@ -41,6 +44,9 @@ export async function runCommand(workspaceRoot: string, stage: string, deps: Run
       workspaceRoot,
       stage,
       apiKey,
+      model: config.model,
+      tokenBudget: config.tokenBudget,
+      allowedDomains: config.allowedDomains,
       chatCompletionFn: deps.chatCompletionFn,
     });
     const endedAt = new Date().toISOString();

@@ -17,3 +17,6 @@ platform/web/frontend/node_modules/
 platform/web/frontend/dist/
 platform/web/frontend/playwright-report/
 platform/web/frontend/test-results/
+
+# Session scratch (subagent-driven-development task briefs/reports/ledger)
+.superpowers/

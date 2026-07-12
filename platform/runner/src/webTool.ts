@@ -1,7 +1,4 @@
-export interface ToolDef {
-  type: 'function';
-  function: { name: string; description: string; parameters: Record<string, unknown> };
-}
+import type { ToolDef } from './openrouter.js';
 
 export const FETCH_URL_DEF: ToolDef = {
   type: 'function',
@@ -48,11 +45,43 @@ function refusalFor(url: URL, allowedDomains: string[]): string | null {
   return null;
 }
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+};
+
+// Decodes the named entities above plus generic decimal (&#233;) and hex (&#xE9;/&#XE9;)
+// numeric entities. Malformed or out-of-range numeric entities are left unchanged rather
+// than throwing (String.fromCodePoint rejects code points outside the valid Unicode range).
+function decodeEntities(text: string): string {
+  return text.replace(/&(#[xX][0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, entity: string) => {
+    if (entity[0] === '#') {
+      const isHex = entity[1] === 'x' || entity[1] === 'X';
+      const numStr = isHex ? entity.slice(2) : entity.slice(1);
+      const codePoint = parseInt(numStr, isHex ? 16 : 10);
+      if (!Number.isFinite(codePoint)) return match;
+      try {
+        return String.fromCodePoint(codePoint);
+      } catch {
+        return match;
+      }
+    }
+    const lower = entity.toLowerCase();
+    return lower in NAMED_ENTITIES ? NAMED_ENTITIES[lower] : match;
+  });
+}
+
 function stripHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
+  return decodeEntities(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+  )
     .replace(/\s+/g, ' ')
     .trim();
 }
