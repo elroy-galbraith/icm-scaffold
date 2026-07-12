@@ -6,6 +6,7 @@ import { createStageActionsRouter } from './routes/stageActions.js';
 import { createRunsRouter } from './routes/runs.js';
 import { createFilesRouter } from './routes/files.js';
 import { createTreeDiffLogRouter } from './routes/treeDiffLog.js';
+import { createResetRouter } from './routes/reset.js';
 
 export function createApp(config: WorkspaceConfig, options: { runDelayMs?: number } = {}): Express {
   const app = express();
@@ -16,5 +17,6 @@ export function createApp(config: WorkspaceConfig, options: { runDelayMs?: numbe
   app.use(createRunsRouter(config));
   app.use(createFilesRouter(config));
   app.use(createTreeDiffLogRouter(config));
+  app.use(createResetRouter(config));
   return app;
 }
