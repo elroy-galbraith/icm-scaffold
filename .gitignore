@@ -4,3 +4,8 @@ stages/*/output/*
 !stages/*/output/.gitkeep
 
 .DS_Store
+
+platform/runner/node_modules/
+platform/runner/dist/
+.runner.lock
+.runner/
