@@ -18,6 +18,7 @@ import { MarkdownViewer } from '../components/MarkdownViewer.js';
 import { MarkdownEditor } from '../components/MarkdownEditor.js';
 import { DiffView } from '../components/DiffView.js';
 import { RunLogPanel } from '../components/RunLogPanel.js';
+import { Sheet } from '../components/ui/Sheet.js';
 
 function addTo(set: Set<string>, name: string): Set<string> {
   const next = new Set(set);
@@ -245,7 +246,15 @@ export function PipelineView() {
         </ul>
       </aside>
 
-      {runLogQuery.data && <RunLogPanel runLog={runLogQuery.data} />}
+      <Sheet
+        open={selectedRunId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedRunId(null);
+        }}
+        title="Run log"
+      >
+        {runLogQuery.data && <RunLogPanel runLog={runLogQuery.data} />}
+      </Sheet>
 
       {selectedPath && fileQuery.data && (
         <section>

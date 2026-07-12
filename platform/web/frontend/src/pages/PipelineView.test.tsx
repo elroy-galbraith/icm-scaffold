@@ -309,6 +309,48 @@ describe('PipelineView', () => {
     expect(screen.getByTestId('run-log-gate-summary')).toHaveTextContent('Done.');
   });
 
+  it('closes the run log drawer when the close button is clicked', async () => {
+    vi.mocked(getPipeline).mockResolvedValue({
+      ...BASE_PIPELINE,
+      stages: BASE_PIPELINE.stages.map((s) =>
+        s.name === '01_research'
+          ? {
+              ...s,
+              lastRun: {
+                runId: 'run-1',
+                status: 'completed',
+                endedAt: '2026-07-12T09:00:00.000Z',
+                tokensSpent: 800,
+                tokenBudget: 200000,
+              },
+            }
+          : s
+      ),
+    });
+    vi.mocked(getTree).mockResolvedValue([]);
+    vi.mocked(getRun).mockResolvedValue({
+      runId: 'run-1',
+      stage: '01_research',
+      model: 'anthropic/claude-sonnet-5',
+      startedAt: '2026-07-12T08:59:00.000Z',
+      endedAt: '2026-07-12T09:00:00.000Z',
+      status: 'completed',
+      filesRead: [],
+      filesWritten: [],
+      toolCalls: [],
+      tokensSpent: 800,
+      tokenBudget: 200000,
+    });
+    renderWithClient(<PipelineView />);
+
+    await waitFor(() => expect(screen.getByTestId('stagecard-viewrun-01_research')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('stagecard-viewrun-01_research'));
+    await waitFor(() => expect(screen.getByTestId('run-log-panel')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('sheet-close'));
+    expect(screen.queryByTestId('run-log-panel')).not.toBeInTheDocument();
+  });
+
   it('shows a toast naming the lock holder when Run races into a 409', async () => {
     vi.mocked(getPipeline).mockResolvedValue(BASE_PIPELINE);
     vi.mocked(getTree).mockResolvedValue([]);
