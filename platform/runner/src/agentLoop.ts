@@ -5,7 +5,7 @@ import type { RunStatus, ToolCallLogEntry } from './runLog.js';
 
 export const DEFAULT_MODEL = 'anthropic/claude-sonnet-5';
 export const DEFAULT_TOKEN_BUDGET = 200_000;
-export const DEFAULT_MAX_TOKENS = 8192;
+export const DEFAULT_MAX_TOKENS = 16384;
 const MAX_TOOL_ERROR_RETRIES = 3;
 const MAX_ITERATIONS = 50;
 
@@ -30,6 +30,10 @@ export interface AgentLoopResult {
   toolCalls: ToolCallLogEntry[];
   gateSummary?: string;
   errorMessage?: string;
+  // Not part of the run-log contract (contracts/schemas/run-log.schema.json is frozen
+  // with additionalProperties: false) — surfaced to the CLI for cost visibility only.
+  cachedTokens: number;
+  cacheWriteTokens: number;
 }
 
 function systemPrompt(stage: string): string {
@@ -57,11 +61,15 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentLoopRe
   ];
 
   let toolErrorStreak = 0;
+  let cachedTokens = 0;
+  let cacheWriteTokens = 0;
 
   try {
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       const response = await chat({ model, messages, tools: TOOL_DEFS, apiKey: params.apiKey, maxTokens });
       budget.add(response.totalTokens);
+      cachedTokens += response.cachedTokens ?? 0;
+      cacheWriteTokens += response.cacheWriteTokens ?? 0;
       messages.push(response.message);
 
       const toolCalls = response.message.tool_calls ?? [];
@@ -112,6 +120,8 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentLoopRe
               budget,
               model,
               tokenBudgetLimit,
+              cachedTokens,
+              cacheWriteTokens,
               `Too many consecutive tool errors; last error: ${content}`
             );
           }
@@ -135,6 +145,8 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentLoopRe
               budget,
               model,
               tokenBudgetLimit,
+              cachedTokens,
+              cacheWriteTokens,
               `Too many consecutive tool errors; last error: ${result.content}`
             );
           }
@@ -144,17 +156,26 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentLoopRe
       }
 
       if (ctx.finished) {
-        return finish('completed', ctx, budget, model, tokenBudgetLimit);
+        return finish('completed', ctx, budget, model, tokenBudgetLimit, cachedTokens, cacheWriteTokens);
       }
     }
 
-    return finish('error', ctx, budget, model, tokenBudgetLimit, `Exceeded ${MAX_ITERATIONS} loop iterations without finishing`);
+    return finish(
+      'error',
+      ctx,
+      budget,
+      model,
+      tokenBudgetLimit,
+      cachedTokens,
+      cacheWriteTokens,
+      `Exceeded ${MAX_ITERATIONS} loop iterations without finishing`
+    );
   } catch (err) {
     if (err instanceof BudgetExceededError) {
-      return finish('aborted_budget', ctx, budget, model, tokenBudgetLimit, err.message);
+      return finish('aborted_budget', ctx, budget, model, tokenBudgetLimit, cachedTokens, cacheWriteTokens, err.message);
     }
     const errorMessage = err instanceof Error ? err.message : String(err);
-    return finish('error', ctx, budget, model, tokenBudgetLimit, errorMessage);
+    return finish('error', ctx, budget, model, tokenBudgetLimit, cachedTokens, cacheWriteTokens, errorMessage);
   }
 }
 
@@ -164,6 +185,8 @@ function finish(
   budget: TokenBudget,
   model: string,
   tokenBudgetLimit: number,
+  cachedTokens: number,
+  cacheWriteTokens: number,
   errorMessage?: string
 ): AgentLoopResult {
   return {
@@ -176,5 +199,7 @@ function finish(
     toolCalls: ctx.toolCalls,
     gateSummary: ctx.gateSummary,
     errorMessage,
+    cachedTokens,
+    cacheWriteTokens,
   };
 }

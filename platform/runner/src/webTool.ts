@@ -16,7 +16,10 @@ export const FETCH_URL_DEF: ToolDef = {
 
 const MAX_REDIRECTS = 5;
 const TIMEOUT_MS = 30_000;
-const MAX_BYTES = 500 * 1024;
+// Identifies the client honestly, per Wikimedia's User-Agent policy and general web
+// etiquette; several allowlisted hosts throttle or reject requests with no UA at all.
+const USER_AGENT = 'icm-scaffold-research-tool/0.1 (fetch_url tool for ICM pipeline research stages)';
+export const MAX_BYTES = 20 * 1024;
 const TRUNCATION_MARKER = '\n\n[... truncated at 500KB ...]';
 
 // SSRF guard: reject IP-literal hosts outright. This does NOT protect against
@@ -103,7 +106,11 @@ export async function fetchUrl(url: string, allowedDomains: string[]): Promise<{
     try {
       let response: Response;
       try {
-        response = await fetch(currentUrl.toString(), { redirect: 'manual', signal: controller.signal });
+        response = await fetch(currentUrl.toString(), {
+          redirect: 'manual',
+          signal: controller.signal,
+          headers: { 'User-Agent': USER_AGENT },
+        });
       } catch (err) {
         return { ok: false, content: `Fetch failed: ${err instanceof Error ? err.message : String(err)}` };
       }

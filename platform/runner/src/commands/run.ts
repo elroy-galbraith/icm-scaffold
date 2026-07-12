@@ -76,6 +76,11 @@ export async function runCommand(workspaceRoot: string, stage: string, deps: Run
     });
 
     console.log(`Run ${runId} (${stage}): ${result.status}`);
+    if (result.cachedTokens > 0 || result.cacheWriteTokens > 0) {
+      console.log(
+        `Prompt cache: ${result.cachedTokens} tokens read from cache, ${result.cacheWriteTokens} written.`
+      );
+    }
     if (result.gateSummary) {
       console.log('\n--- Gate summary ---\n' + result.gateSummary);
     }

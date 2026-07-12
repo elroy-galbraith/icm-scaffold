@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchUrl, FETCH_URL_DEF } from '../src/webTool.js';
+import { fetchUrl, FETCH_URL_DEF, MAX_BYTES } from '../src/webTool.js';
 
 function htmlResponse(body: string, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(body, { status, headers });
@@ -88,13 +88,13 @@ describe('fetchUrl', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('truncates content over the 500KB cap with a marker', async () => {
-    const big = 'a'.repeat(600 * 1024);
+  it('truncates content over the MAX_BYTES cap with a marker', async () => {
+    const big = 'a'.repeat(MAX_BYTES + 100 * 1024);
     vi.stubGlobal('fetch', vi.fn(async () => htmlResponse(big)));
     const result = await fetchUrl('https://example.com/big', ['example.com']);
     expect(result.ok).toBe(true);
     expect(result.content).toContain('truncated');
-    expect(result.content.length).toBeLessThan(600 * 1024);
+    expect(result.content.length).toBeLessThan(big.length);
   });
 
   it('refuses IPv6-literal hosts even when nominally allowlisted', async () => {

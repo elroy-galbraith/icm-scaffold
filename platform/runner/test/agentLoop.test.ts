@@ -11,6 +11,8 @@ const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/workspace', import.meta.ur
 interface ScriptStep {
   toolCalls?: Array<{ name: string; args?: Record<string, unknown>; rawArguments?: string }>;
   totalTokens: number;
+  cachedTokens?: number;
+  cacheWriteTokens?: number;
 }
 
 function scriptedChat(script: ScriptStep[], onCall?: (params: ChatCompletionParams) => void): ChatCompletionFn {
@@ -31,6 +33,8 @@ function scriptedChat(script: ScriptStep[], onCall?: (params: ChatCompletionPara
         })),
       },
       totalTokens: step.totalTokens,
+      cachedTokens: step.cachedTokens,
+      cacheWriteTokens: step.cacheWriteTokens,
     };
   };
 }
@@ -81,6 +85,57 @@ describe('runAgentLoop', () => {
     expect(readFileSync(join(workspaceRoot, 'stages/01_research/output/findings.md'), 'utf-8')).toBe(
       '# Findings\n'
     );
+  });
+
+  it('accumulates cached and cache-write tokens across iterations', async () => {
+    const chat = scriptedChat([
+      {
+        toolCalls: [{ name: 'read_file', args: { path: 'CLAUDE.md' } }],
+        totalTokens: 50,
+        cachedTokens: 0,
+        cacheWriteTokens: 20,
+      },
+      {
+        toolCalls: [
+          { name: 'finish_stage', args: { gateSummary: 'Done. Verify: nothing to check.' } },
+        ],
+        totalTokens: 30,
+        cachedTokens: 45,
+        cacheWriteTokens: 0,
+      },
+    ]);
+
+    const result = await runAgentLoop({
+      workspaceRoot,
+      stage: '01_research',
+      apiKey: 'test-key',
+      chatCompletionFn: chat,
+    });
+
+    expect(result.status).toBe('completed');
+    expect(result.cachedTokens).toBe(45);
+    expect(result.cacheWriteTokens).toBe(20);
+  });
+
+  it('defaults cached and cache-write tokens to 0 when the chat function omits them', async () => {
+    const chat = scriptedChat([
+      {
+        toolCalls: [
+          { name: 'finish_stage', args: { gateSummary: 'Done. Verify: nothing to check.' } },
+        ],
+        totalTokens: 30,
+      },
+    ]);
+
+    const result = await runAgentLoop({
+      workspaceRoot,
+      stage: '01_research',
+      apiKey: 'test-key',
+      chatCompletionFn: chat,
+    });
+
+    expect(result.cachedTokens).toBe(0);
+    expect(result.cacheWriteTokens).toBe(0);
   });
 
   it('passes the default max_tokens to every chat call when no override is given', async () => {
