@@ -19,7 +19,7 @@ export function createRunsRouter(config: WorkspaceConfig): Router {
   });
 
   router.get('/api/runs/:runId', (req, res) => {
-    const log = readRunLog(config.scratchDir, req.params.runId);
+    const log = readRunLog(config.workspaceRoot, req.params.runId);
     if (!log) {
       res.status(404).json({ error: 'Unknown run' });
       return;

@@ -73,7 +73,7 @@ export function createFilesRouter(config: WorkspaceConfig): Router {
     const path = typeof req.query.path === 'string' ? req.query.path : '';
     let resolved: { absolute: string; relative: string };
     try {
-      resolved = resolveWorkspacePath(config.scratchDir, path);
+      resolved = resolveWorkspacePath(config.workspaceRoot, path);
     } catch {
       res.status(403).json({ error: 'Path escapes workspace' });
       return;
@@ -95,7 +95,7 @@ export function createFilesRouter(config: WorkspaceConfig): Router {
 
     let resolved: { absolute: string; relative: string };
     try {
-      resolved = resolveWorkspacePath(config.scratchDir, path);
+      resolved = resolveWorkspacePath(config.workspaceRoot, path);
     } catch {
       res.status(403).json({ error: 'Path escapes workspace' });
       return;
@@ -105,7 +105,7 @@ export function createFilesRouter(config: WorkspaceConfig): Router {
       return;
     }
 
-    const lock = readLock(config.scratchDir);
+    const lock = readLock(config.workspaceRoot);
     if (lock) {
       res.status(409).json({ runId: lock.runId, stage: lock.stage, acquiredAt: lock.acquiredAt });
       return;
@@ -113,7 +113,7 @@ export function createFilesRouter(config: WorkspaceConfig): Router {
 
     mkdirSync(dirname(resolved.absolute), { recursive: true });
     writeFileSync(resolved.absolute, content, 'utf-8');
-    commitWorkspace(config.scratchDir, `human edit: ${path}`);
+    commitWorkspace(config.workspaceRoot, `human edit: ${path}`);
     res.status(200).json({});
   });
 

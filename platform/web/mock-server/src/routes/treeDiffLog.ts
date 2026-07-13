@@ -6,7 +6,7 @@ export function createTreeDiffLogRouter(config: WorkspaceConfig): Router {
   const router = Router();
 
   router.get('/api/tree', (_req, res) => {
-    res.status(200).json(getTree(config.scratchDir));
+    res.status(200).json(getTree(config.workspaceRoot));
   });
 
   router.get('/api/diff', (req, res) => {
@@ -26,7 +26,7 @@ export function createTreeDiffLogRouter(config: WorkspaceConfig): Router {
     }
 
     try {
-      res.status(200).json(getDiff(config.scratchDir, path, ref));
+      res.status(200).json(getDiff(config.workspaceRoot, path, ref));
     } catch (err) {
       if (err instanceof InvalidRefError) {
         res.status(400).json({ error: 'invalid ref' });
@@ -39,7 +39,7 @@ export function createTreeDiffLogRouter(config: WorkspaceConfig): Router {
   router.get('/api/log', (req, res) => {
     const rawLimit = typeof req.query.limit === 'string' ? Number.parseInt(req.query.limit, 10) : NaN;
     const limit = Number.isFinite(rawLimit) ? rawLimit : 50;
-    res.status(200).json(getLog(config.scratchDir, limit));
+    res.status(200).json(getLog(config.workspaceRoot, limit));
   });
 
   return router;

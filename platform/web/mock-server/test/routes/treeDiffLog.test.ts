@@ -13,13 +13,13 @@ describe('GET /api/tree, /api/diff, /api/log', () => {
   let config: WorkspaceConfig;
 
   beforeEach(() => {
-    const scratchDir = join(mkdtempSync(join(tmpdir(), 'route-tree-')), 'workspace');
-    config = { fixtureDir: FIXTURE_DIR, scratchDir, pendingStage: '03_report' };
+    const workspaceRoot = join(mkdtempSync(join(tmpdir(), 'route-tree-')), 'workspace');
+    config = { fixtureDir: FIXTURE_DIR, workspaceRoot, pendingStage: '03_report' };
     seedWorkspace(config);
   });
 
   afterEach(() => {
-    rmSync(config.scratchDir, { recursive: true, force: true });
+    rmSync(config.workspaceRoot, { recursive: true, force: true });
   });
 
   it('GET /api/tree lists workspace entries including .runner', async () => {
@@ -40,10 +40,10 @@ describe('GET /api/tree, /api/diff, /api/log', () => {
   });
 
   it('GET /api/diff shows a non-empty diff after a committed edit', async () => {
-    writeFileSync(join(config.scratchDir, 'shared/client-brief.md'), 'A materially different brief.');
+    writeFileSync(join(config.workspaceRoot, 'shared/client-brief.md'), 'A materially different brief.');
     const { execFileSync } = await import('node:child_process');
-    execFileSync('git', ['add', '-A'], { cwd: config.scratchDir });
-    execFileSync('git', ['commit', '-m', 'edit brief'], { cwd: config.scratchDir });
+    execFileSync('git', ['add', '-A'], { cwd: config.workspaceRoot });
+    execFileSync('git', ['commit', '-m', 'edit brief'], { cwd: config.workspaceRoot });
 
     const app = createApp(config);
     const res = await request(app).get('/api/diff').query({ path: 'shared/client-brief.md', ref: 'HEAD~1' });
@@ -75,10 +75,10 @@ describe('GET /api/tree, /api/diff, /api/log', () => {
   });
 
   it('GET /api/diff still succeeds for a legitimate ref and path (happy path unchanged)', async () => {
-    writeFileSync(join(config.scratchDir, 'shared/client-brief.md'), 'A materially different brief.');
+    writeFileSync(join(config.workspaceRoot, 'shared/client-brief.md'), 'A materially different brief.');
     const { execFileSync } = await import('node:child_process');
-    execFileSync('git', ['add', '-A'], { cwd: config.scratchDir });
-    execFileSync('git', ['commit', '-m', 'edit brief'], { cwd: config.scratchDir });
+    execFileSync('git', ['add', '-A'], { cwd: config.workspaceRoot });
+    execFileSync('git', ['commit', '-m', 'edit brief'], { cwd: config.workspaceRoot });
 
     const app = createApp(config);
     const res = await request(app).get('/api/diff').query({ path: 'shared/client-brief.md', ref: 'HEAD~1' });
@@ -87,10 +87,10 @@ describe('GET /api/tree, /api/diff, /api/log', () => {
   });
 
   it('GET /api/log returns commits newest first and respects limit', async () => {
-    writeFileSync(join(config.scratchDir, 'shared/client-brief.md'), 'v2');
+    writeFileSync(join(config.workspaceRoot, 'shared/client-brief.md'), 'v2');
     const { execFileSync } = await import('node:child_process');
-    execFileSync('git', ['add', '-A'], { cwd: config.scratchDir });
-    execFileSync('git', ['commit', '-m', 'second commit'], { cwd: config.scratchDir });
+    execFileSync('git', ['add', '-A'], { cwd: config.workspaceRoot });
+    execFileSync('git', ['commit', '-m', 'second commit'], { cwd: config.workspaceRoot });
 
     const app = createApp(config);
     const res = await request(app).get('/api/log').query({ limit: 1 });

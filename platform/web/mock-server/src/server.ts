@@ -9,5 +9,5 @@ const app = createApp(DEFAULT_WORKSPACE_CONFIG);
 
 app.listen(PORT, () => {
   console.log(`ICM mock server listening on http://localhost:${PORT}`);
-  console.log(`Scratch workspace: ${DEFAULT_WORKSPACE_CONFIG.scratchDir}`);
+  console.log(`Scratch workspace: ${DEFAULT_WORKSPACE_CONFIG.workspaceRoot}`);
 });

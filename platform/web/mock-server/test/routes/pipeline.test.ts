@@ -13,13 +13,13 @@ describe('GET /api/pipeline', () => {
   let config: WorkspaceConfig;
 
   beforeEach(() => {
-    const scratchDir = join(mkdtempSync(join(tmpdir(), 'route-pipeline-')), 'workspace');
-    config = { fixtureDir: FIXTURE_DIR, scratchDir, pendingStage: '03_report' };
+    const workspaceRoot = join(mkdtempSync(join(tmpdir(), 'route-pipeline-')), 'workspace');
+    config = { fixtureDir: FIXTURE_DIR, workspaceRoot, pendingStage: '03_report' };
     seedWorkspace(config);
   });
 
   afterEach(() => {
-    rmSync(config.scratchDir, { recursive: true, force: true });
+    rmSync(config.workspaceRoot, { recursive: true, force: true });
   });
 
   it('returns 200 with the seeded pipeline: two approved stages and one pending', async () => {

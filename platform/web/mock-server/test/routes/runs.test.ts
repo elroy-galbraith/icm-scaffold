@@ -14,20 +14,20 @@ describe('GET /api/runs/:runId', () => {
   let config: WorkspaceConfig;
 
   beforeEach(() => {
-    const scratchDir = join(mkdtempSync(join(tmpdir(), 'route-runs-')), 'workspace');
-    config = { fixtureDir: FIXTURE_DIR, scratchDir, pendingStage: '03_report' };
+    const workspaceRoot = join(mkdtempSync(join(tmpdir(), 'route-runs-')), 'workspace');
+    config = { fixtureDir: FIXTURE_DIR, workspaceRoot, pendingStage: '03_report' };
     seedWorkspace(config);
   });
 
   afterEach(() => {
-    rmSync(config.scratchDir, { recursive: true, force: true });
+    rmSync(config.workspaceRoot, { recursive: true, force: true });
   });
 
   const KNOWN_RUN_ID = '11111111-1111-1111-1111-111111111111';
   const UNKNOWN_RUN_ID = '22222222-2222-2222-2222-222222222222';
 
   it('returns the full run log for a known runId', async () => {
-    writeRunLog(config.scratchDir, {
+    writeRunLog(config.workspaceRoot, {
       runId: KNOWN_RUN_ID,
       stage: '01_research',
       model: 'anthropic/claude-sonnet-5',
@@ -63,7 +63,7 @@ describe('GET /api/runs/:runId', () => {
   it('rejects a path-traversal runId that would otherwise escape .runner/runs/', async () => {
     const app = createApp(config);
     // Encoded slash: without a route-param validator this reaches readRunLog's
-    // join() and resolves to <scratchDir>/.runner/state.json instead of a run log.
+    // join() and resolves to <workspaceRoot>/.runner/state.json instead of a run log.
     const res = await request(app).get('/api/runs/..%2Fstate');
     expect(res.status).toBe(400);
     expect(res.body).not.toHaveProperty('stages');
