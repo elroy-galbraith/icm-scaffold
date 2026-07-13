@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { buildPipelineView } from '../pipeline.js';
+import { buildPipelineView } from 'icm-web-shared';
 import type { WorkspaceConfig } from '../workspace.js';
 
 export function createPipelineRouter(config: WorkspaceConfig): Router {
