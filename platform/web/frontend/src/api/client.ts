@@ -1,9 +1,15 @@
 import type {
+  StageStatus,
+  RunStatus,
+  LastRunSummary,
+  StageView,
+  ToolCallLogEntry,
   RunLog,
   TreeEntry,
   DiffResult,
   LogEntry,
   PipelineView as Pipeline,
+  LockInfo as LockView,
 } from 'icm-web-shared';
 export type {
   StageStatus,
@@ -15,8 +21,9 @@ export type {
   TreeEntry,
   DiffResult,
   LogEntry,
-} from 'icm-web-shared';
-export type { PipelineView as Pipeline, LockInfo as LockView } from 'icm-web-shared';
+  Pipeline,
+  LockView,
+};
 
 export interface FileContent {
   path: string;

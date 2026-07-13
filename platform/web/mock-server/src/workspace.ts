@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { listStageNames } from 'icm-web-shared';
+import { STAGE_NAME_PATTERN, listStageNames } from 'icm-web-shared';
 
-export { STAGE_NAME_PATTERN, listStageNames } from 'icm-web-shared';
+export { STAGE_NAME_PATTERN, listStageNames };
 
 export interface WorkspaceConfig {
   fixtureDir: string;

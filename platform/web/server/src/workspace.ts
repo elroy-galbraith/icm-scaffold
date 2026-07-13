@@ -2,9 +2,9 @@ import { existsSync, mkdirSync, rmSync, cpSync, writeFileSync, readFileSync } fr
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { listStageNames, readState, type StageStatus } from 'icm-web-shared';
+import { STAGE_NAME_PATTERN, listStageNames, readState, type StageStatus } from 'icm-web-shared';
 
-export { STAGE_NAME_PATTERN, listStageNames } from 'icm-web-shared';
+export { STAGE_NAME_PATTERN, listStageNames };
 
 export interface WorkspaceConfig {
   workspaceRoot: string;
