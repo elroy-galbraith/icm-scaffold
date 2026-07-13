@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import express from 'express';
 import request from 'supertest';
-import { createPipelineRouter } from '../../src/routes/pipeline.js';
+import { createPipelineRouter } from 'icm-web-shared';
 import { seedTestWorkspace } from '../helpers/seedTestWorkspace.js';
 import type { WorkspaceConfig } from '../../src/workspace.js';
 

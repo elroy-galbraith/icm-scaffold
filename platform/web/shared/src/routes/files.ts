@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync, realpathSync } from 'node:fs';
 import { resolve, relative, isAbsolute, dirname, sep } from 'node:path';
-import type { WorkspaceConfig } from '../workspace.js';
-import { readLock } from 'icm-web-shared';
-import { commitWorkspace } from 'icm-web-shared';
+import type { WorkspaceRootConfig } from '../workspace.js';
+import { readLock } from '../state.js';
+import { commitWorkspace } from '../git.js';
 
 class PathEscapesWorkspaceError extends Error {}
 
@@ -66,7 +66,7 @@ function isRunnerPath(workspaceRelativePath: string): boolean {
   return firstSegment === '.runner' || workspaceRelativePath === '.runner.lock';
 }
 
-export function createFilesRouter(config: WorkspaceConfig): Router {
+export function createFilesRouter(config: WorkspaceRootConfig): Router {
   const router = Router();
 
   router.get('/api/files', (req, res) => {

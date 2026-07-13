@@ -106,4 +106,11 @@ describe('GET /api/tree, /api/diff, /api/log', () => {
     expect(res.body).toHaveLength(1);
     expect(res.body[0].message).toBe('Seed workspace from Meridian fixture');
   });
+
+  it('GET /api/log treats a non-positive limit as invalid and falls back to 50', async () => {
+    const app = createApp(config);
+    const res = await request(app).get('/api/log').query({ limit: '-5' });
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeLessThanOrEqual(50);
+  });
 });

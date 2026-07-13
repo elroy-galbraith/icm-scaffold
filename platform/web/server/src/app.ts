@@ -1,10 +1,7 @@
 import express, { type Express } from 'express';
 import cors from 'cors';
 import type { WorkspaceConfig } from './workspace.js';
-import { createPipelineRouter } from './routes/pipeline.js';
-import { createRunsRouter } from './routes/runs.js';
-import { createFilesRouter } from './routes/files.js';
-import { createTreeDiffLogRouter } from './routes/treeDiffLog.js';
+import { createPipelineRouter, createRunsRouter, createFilesRouter, createTreeDiffLogRouter } from 'icm-web-shared';
 import { createStageActionsRouter } from './routes/stageActions.js';
 import type { RunnerCli } from './runnerCli.js';
 

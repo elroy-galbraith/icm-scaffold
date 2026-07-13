@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import type { WorkspaceConfig } from '../workspace.js';
-import { readRunLog } from 'icm-web-shared';
+import type { WorkspaceRootConfig } from '../workspace.js';
+import { readRunLog } from '../state.js';
 
 // Run IDs are always server-generated via randomUUID(). Rejecting anything else
 // before it reaches readRunLog's join() closes a directory-traversal read (e.g.
 // runId=..%2Fstate resolves to .runner/state.json instead of a run log).
 const RUN_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function createRunsRouter(config: WorkspaceConfig): Router {
+export function createRunsRouter(config: WorkspaceRootConfig): Router {
   const router = Router();
 
   router.param('runId', (req, res, next, runId) => {
