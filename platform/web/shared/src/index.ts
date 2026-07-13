@@ -6,3 +6,4 @@ export * from './routes/pipeline.js';
 export * from './routes/runs.js';
 export * from './routes/treeDiffLog.js';
 export * from './routes/files.js';
+export * from './routes/stageNameGuard.js';

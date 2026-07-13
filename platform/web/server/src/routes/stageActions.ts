@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { STAGE_NAME_PATTERN, checkStageOrder, type WorkspaceConfig } from '../workspace.js';
+import { checkStageOrder, type WorkspaceConfig } from '../workspace.js';
+import { registerStageNameGuard } from 'icm-web-shared';
 import { readState, readLock, type StageStatus } from 'icm-web-shared';
 import { defaultRunnerCli, type RunnerCli } from '../runnerCli.js';
 import { commitWorkspace } from 'icm-web-shared';
@@ -16,13 +17,7 @@ export function createStageActionsRouter(
   const router = Router();
   const runnerCli = options.runnerCli ?? defaultRunnerCli;
 
-  router.param('stage', (req, res, next, stage) => {
-    if (!STAGE_NAME_PATTERN.test(stage)) {
-      res.status(400).json({ error: 'Invalid stage name' });
-      return;
-    }
-    next();
-  });
+  registerStageNameGuard(router);
 
   router.post('/api/stages/:stage/run', (req, res) => {
     const { stage } = req.params;
