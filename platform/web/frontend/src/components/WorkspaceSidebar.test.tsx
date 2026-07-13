@@ -109,4 +109,28 @@ describe('WorkspaceSidebar', () => {
     fireEvent.click(screen.getByTestId('stage-group-toggle-01_research'));
     expect(screen.getByTestId('file-tree-entry-stages/01_research/output/findings.md')).toHaveClass('font-semibold');
   });
+
+  it('freezes the focus-stage default at mount, ignoring later changes to stages', () => {
+    const { rerender } = render(
+      <WorkspaceSidebar treeEntries={ENTRIES} stages={STAGES} selectedPath={null} onSelect={vi.fn()} />
+    );
+    // 03_report is the focus stage at mount (pending, unblocked) -> expanded by default.
+    expect(screen.getByTestId('stage-group-toggle-03_report')).toHaveTextContent('▾');
+
+    // Simulate a poll where 03_report becomes approved and 01_research becomes rejected
+    // (the new "live" focus stage, if it were recomputed).
+    const updatedStages: StageView[] = [
+      { name: '01_research', status: 'rejected', running: false },
+      { name: '02_analysis', status: 'approved', running: false },
+      { name: '03_report', status: 'approved', running: false },
+    ];
+    rerender(
+      <WorkspaceSidebar treeEntries={ENTRIES} stages={updatedStages} selectedPath={null} onSelect={vi.fn()} />
+    );
+
+    // Neither section was manually toggled, so both must keep their mount-time default,
+    // not follow the new live focus stage (01_research).
+    expect(screen.getByTestId('stage-group-toggle-03_report')).toHaveTextContent('▾');
+    expect(screen.getByTestId('stage-group-toggle-01_research')).toHaveTextContent('▸');
+  });
 });

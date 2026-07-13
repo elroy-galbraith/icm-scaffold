@@ -47,8 +47,8 @@ export const WorkspaceSidebar = forwardRef<WorkspaceSidebarHandle, WorkspaceSide
 ) {
   const stageNames = stages.map((s) => s.name);
   const grouped = groupTree(treeEntries, stageNames);
-  const focusStage = computeFocusStage(stages);
 
+  const [focusStage] = useState(() => computeFocusStage(stages));
   const [manualExpand, setManualExpand] = useState<Record<string, boolean>>({});
   const [secondaryExpand, setSecondaryExpand] = useState<Record<string, boolean>>({});
   const sectionRefs = useRef(new Map<string, HTMLDivElement>());
