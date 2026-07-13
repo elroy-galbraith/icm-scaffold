@@ -13,6 +13,7 @@ import {
   ApiError,
   type StageStatus,
 } from '../api/client.js';
+import { computeBlockedBy } from '../lib/pipelineStatus.js';
 import { StageCard } from '../components/StageCard.js';
 import { MarkdownViewer } from '../components/MarkdownViewer.js';
 import { MarkdownEditor } from '../components/MarkdownEditor.js';
@@ -53,19 +54,6 @@ export function describeApiError(err: unknown): string {
     return `API error ${err.status}`;
   }
   return err instanceof Error ? err.message : 'Unknown error';
-}
-
-function computeBlockedBy(
-  stages: Array<{ name: string; status: StageStatus }>,
-  stageName: string
-): { stage: string; status: StageStatus } | null {
-  for (const s of stages) {
-    if (s.name >= stageName) break;
-    if (s.status !== 'approved') {
-      return { stage: s.name, status: s.status };
-    }
-  }
-  return null;
 }
 
 export function PipelineView() {
