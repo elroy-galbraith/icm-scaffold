@@ -266,4 +266,22 @@ describe('StageCard', () => {
     );
     expect(screen.queryByTestId('stagecard-viewrun-03_report')).not.toBeInTheDocument();
   });
+
+  it('calls onSelectStage with the stage name when the header is clicked, without triggering Run', () => {
+    const onSelectStage = vi.fn();
+    const onRun = vi.fn();
+    render(
+      <StageCard
+        stage={makeStage()}
+        workspaceLocked={false}
+        onRun={onRun}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onSelectStage={onSelectStage}
+      />
+    );
+    fireEvent.click(screen.getByTestId('stagecard-header-03_report'));
+    expect(onSelectStage).toHaveBeenCalledWith('03_report');
+    expect(onRun).not.toHaveBeenCalled();
+  });
 });

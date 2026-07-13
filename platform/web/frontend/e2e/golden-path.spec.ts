@@ -22,7 +22,9 @@ test('golden path: run the pending stage, watch it complete, open the diff, edit
   await page.getByTestId('file-tree-entry-stages/03_report/output/report.md').click();
   await expect(page.getByTestId('diff-view')).toBeVisible();
 
-  // Edit a different file and save it.
+  // Edit a different file and save it. It's a workspace-level file, not a stage output,
+  // so it lives in the collapsed-by-default Workspace group — expand that first.
+  await page.getByTestId('workspace-group-toggle').click();
   await page.getByTestId('file-tree-entry-shared/client-brief.md').click();
   await expect(page.getByTestId('markdown-viewer')).toBeVisible();
   await page.getByTestId('file-edit-toggle').click();
