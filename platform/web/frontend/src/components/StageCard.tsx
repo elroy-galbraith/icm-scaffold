@@ -15,6 +15,7 @@ export interface StageCardProps {
   onApprove: (stage: string) => void;
   onReject: (stage: string, comment: string) => void;
   onViewRun?: (runId: string) => void;
+  onSelectStage?: (stage: string) => void;
 }
 
 export const STATUS_TONE: Record<StageStatus, 'approved' | 'review' | 'rejected' | 'pending'> = {
@@ -35,6 +36,7 @@ export function StageCard({
   onApprove,
   onReject,
   onViewRun,
+  onSelectStage,
 }: StageCardProps) {
   const failed =
     stage.status === 'pending' &&
@@ -52,12 +54,17 @@ export function StageCard({
 
   return (
     <Card data-testid={`stagecard-${stage.name}`} className="flex min-w-[220px] flex-1 flex-col gap-2 p-4">
-      <div className="flex items-center justify-between gap-2">
+      <button
+        type="button"
+        data-testid={`stagecard-header-${stage.name}`}
+        onClick={() => onSelectStage?.(stage.name)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
         <h2 className="font-serif text-base font-bold text-ink">{stage.name}</h2>
         <Badge tone={STATUS_TONE[stage.status]} data-testid={`stagecard-status-${stage.name}`}>
           {stage.status}
         </Badge>
-      </div>
+      </button>
 
       {stage.running && (
         <span data-testid={`stagecard-running-${stage.name}`} className="text-xs text-muted">
