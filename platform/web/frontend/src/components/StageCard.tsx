@@ -17,7 +17,7 @@ export interface StageCardProps {
   onViewRun?: (runId: string) => void;
 }
 
-const STATUS_TONE: Record<StageStatus, 'approved' | 'review' | 'rejected' | 'pending'> = {
+export const STATUS_TONE: Record<StageStatus, 'approved' | 'review' | 'rejected' | 'pending'> = {
   approved: 'approved',
   awaiting_review: 'review',
   rejected: 'rejected',
