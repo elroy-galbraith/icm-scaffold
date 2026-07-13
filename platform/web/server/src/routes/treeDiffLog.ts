@@ -35,7 +35,7 @@ export function createTreeDiffLogRouter(config: WorkspaceConfig): Router {
 
   router.get('/api/log', (req, res) => {
     const rawLimit = typeof req.query.limit === 'string' ? Number.parseInt(req.query.limit, 10) : NaN;
-    const limit = Number.isFinite(rawLimit) ? rawLimit : 50;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 50;
     res.status(200).json(getLog(config.workspaceRoot, limit));
   });
 

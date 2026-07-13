@@ -97,4 +97,16 @@ describe('loadOpenRouterApiKey', () => {
     writeFileSync(envPath, 'SOME_OTHER_VAR=x\n');
     expect(loadOpenRouterApiKey(envPath)).toBeUndefined();
   });
+
+  it('strips surrounding double quotes from the parsed value', () => {
+    const envPath = join(envDir, '.env');
+    writeFileSync(envPath, 'OPENROUTER_API_KEY="sk-or-test-value"\n');
+    expect(loadOpenRouterApiKey(envPath)).toBe('sk-or-test-value');
+  });
+
+  it('strips surrounding single quotes from the parsed value', () => {
+    const envPath = join(envDir, '.env');
+    writeFileSync(envPath, "OPENROUTER_API_KEY='sk-or-test-value'\n");
+    expect(loadOpenRouterApiKey(envPath)).toBe('sk-or-test-value');
+  });
 });

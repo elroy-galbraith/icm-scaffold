@@ -20,7 +20,11 @@ export function loadOpenRouterApiKey(envPath: string = join(RUNNER_DIR, '.env'))
     .map((l) => l.trim())
     .find((l) => l.startsWith(API_KEY_PREFIX));
   if (!line) return undefined;
-  return line.slice(API_KEY_PREFIX.length).trim();
+  const value = line.slice(API_KEY_PREFIX.length).trim();
+  // A value quoted as OPENROUTER_API_KEY="sk-or-..." (common when a key is
+  // copy-pasted from a secrets UI) would otherwise pass the literal quote
+  // characters to OpenRouter and fail auth with no clear signal why.
+  return value.replace(/^['"]|['"]$/g, '');
 }
 
 function runnerEnv(): NodeJS.ProcessEnv {

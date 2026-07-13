@@ -54,4 +54,13 @@ describe('GET /api/tree, /api/diff, /api/log', () => {
     expect(res.body.length).toBeGreaterThan(0);
     expect(res.body[0].message).toBe('seed');
   });
+
+  it('GET /api/log falls back to the default limit for a non-positive limit instead of passing it through', async () => {
+    const app = express();
+    app.use(createTreeDiffLogRouter(config));
+    const res = await request(app).get('/api/log').query({ limit: '0' });
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body[0].message).toBe('seed');
+  });
 });

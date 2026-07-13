@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { commitWorkspace, currentHead, getTree, getDiff, getLog } from '../src/git.js';
@@ -86,5 +86,26 @@ describe('git', () => {
     expect(log[0].message).toBe('second commit');
     expect(log[0].sha).toHaveLength(40);
     expect(new Date(log[0].date).toISOString()).toBe(log[0].date);
+  });
+
+  it('getLog returns [] rather than throwing for a repo with no commits yet', () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), 'web-git-empty-'));
+    execFileSync('git', ['init'], { cwd: emptyRoot });
+    expect(getLog(emptyRoot, 50)).toEqual([]);
+    rmSync(emptyRoot, { recursive: true, force: true });
+  });
+
+  it('getTree does not follow a symlink that escapes the workspace', () => {
+    const outsideDir = mkdtempSync(join(tmpdir(), 'web-git-outside-'));
+    writeFileSync(join(outsideDir, 'secret.md'), 'outside content');
+    symlinkSync(outsideDir, join(workspaceRoot, 'escape-link'));
+
+    const tree = getTree(workspaceRoot);
+    const linkEntry = tree.find((e) => e.path === 'escape-link');
+
+    expect(linkEntry?.type).toBe('file');
+    expect(tree.map((e) => e.path)).not.toContain('escape-link/secret.md');
+
+    rmSync(outsideDir, { recursive: true, force: true });
   });
 });

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, lstatSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 export interface TreeEntry {
@@ -46,7 +46,12 @@ function walk(root: string, dir: string, entries: TreeEntry[]): void {
     if (EXCLUDED_DIR_NAMES.has(name)) continue;
     const fullPath = join(dir, name);
     const relPath = relative(root, fullPath).split(sep).join('/');
-    const isDir = statSync(fullPath).isDirectory();
+    // lstatSync (not statSync) so a symlink is never followed here: a symlink
+    // pointing outside the workspace would otherwise let the walk recurse out
+    // of the workspace root (or loop forever on a circular symlink). A symlink
+    // itself is reported as 'file' — there's no 'symlink' entry in the
+    // TreeEntry contract, and not recursing into it is the safe default.
+    const isDir = lstatSync(fullPath).isDirectory();
     entries.push({ path: relPath, type: isDir ? 'dir' : 'file' });
     if (isDir) {
       walk(root, fullPath, entries);
@@ -87,15 +92,26 @@ export function getDiff(workspaceRoot: string, path: string, ref: string): DiffR
 
 export function getLog(workspaceRoot: string, limit: number): LogEntry[] {
   const format = '%H%x1f%s%x1f%cI';
-  const output = execFileSync('git', ['log', `-n`, String(limit), `--pretty=format:${format}`], {
-    cwd: workspaceRoot,
-  }).toString();
-  if (output.trim().length === 0) return [];
-  return output
-    .split('\n')
-    .filter((line) => line.length > 0)
-    .map((line) => {
-      const [sha, message, date] = line.split('\x1f');
-      return { sha, message, date: new Date(date).toISOString() };
-    });
+  // git log exits non-zero on a repo with no commits yet ("does not have any
+  // commits yet"), regardless of -n. Not reachable via this package's own
+  // seeding (it always commits before the server starts), but the OpenAPI
+  // contract documents no error status for /api/log, and getDiff right above
+  // already treats an analogous "nothing to show yet" git failure as empty
+  // rather than a server error — same treatment here for consistency.
+  try {
+    const output = execFileSync('git', ['log', `-n`, String(limit), `--pretty=format:${format}`], {
+      cwd: workspaceRoot,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).toString();
+    if (output.trim().length === 0) return [];
+    return output
+      .split('\n')
+      .filter((line) => line.length > 0)
+      .map((line) => {
+        const [sha, message, date] = line.split('\x1f');
+        return { sha, message, date: new Date(date).toISOString() };
+      });
+  } catch {
+    return [];
+  }
 }
