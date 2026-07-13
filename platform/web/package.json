@@ -1,0 +1,10 @@
+{
+  "name": "icm-web",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "mock-server",
+    "server",
+    "shared"
+  ]
+}
