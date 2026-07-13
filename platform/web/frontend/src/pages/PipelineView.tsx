@@ -11,9 +11,10 @@ import {
   getDiff,
   getRun,
   ApiError,
-  type StageStatus,
 } from '../api/client.js';
+import { computeBlockedBy } from '../lib/pipelineStatus.js';
 import { StageCard } from '../components/StageCard.js';
+import { WorkspaceSidebar, type WorkspaceSidebarHandle } from '../components/WorkspaceSidebar.js';
 import { MarkdownViewer } from '../components/MarkdownViewer.js';
 import { MarkdownEditor } from '../components/MarkdownEditor.js';
 import { DiffView } from '../components/DiffView.js';
@@ -55,24 +56,12 @@ export function describeApiError(err: unknown): string {
   return err instanceof Error ? err.message : 'Unknown error';
 }
 
-function computeBlockedBy(
-  stages: Array<{ name: string; status: StageStatus }>,
-  stageName: string
-): { stage: string; status: StageStatus } | null {
-  for (const s of stages) {
-    if (s.name >= stageName) break;
-    if (s.status !== 'approved') {
-      return { stage: s.name, status: s.status };
-    }
-  }
-  return null;
-}
-
 export function PipelineView() {
   const queryClient = useQueryClient();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const sidebarRef = useRef<WorkspaceSidebarHandle>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['pipeline'],
@@ -197,8 +186,6 @@ export function PipelineView() {
     );
   }
 
-  const files = (treeQuery.data ?? []).filter((entry) => entry.type === 'file');
-
   return (
     <div className="flex h-screen flex-col bg-canvas text-ink">
       {toasts.length > 0 && (
@@ -238,28 +225,16 @@ export function PipelineView() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-56 shrink-0 overflow-y-auto border-r border-border px-4 py-4">
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Files</h2>
-          <ul data-testid="file-tree" className="space-y-1">
-            {files.map((entry) => (
-              <li key={entry.path}>
-                <button
-                  type="button"
-                  data-testid={`file-tree-entry-${entry.path}`}
-                  onClick={() => {
-                    setSelectedPath(entry.path);
-                    setEditing(false);
-                  }}
-                  className={`w-full truncate rounded px-2 py-1 text-left text-xs hover:bg-white ${
-                    selectedPath === entry.path ? 'bg-white font-semibold text-ink' : 'text-muted'
-                  }`}
-                >
-                  {entry.path}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </aside>
+        <WorkspaceSidebar
+          ref={sidebarRef}
+          treeEntries={treeQuery.data ?? []}
+          stages={data.stages}
+          selectedPath={selectedPath}
+          onSelect={(path) => {
+            setSelectedPath(path);
+            setEditing(false);
+          }}
+        />
 
         <main className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
           <div data-testid="stage-list" className="flex flex-wrap gap-3">
@@ -276,6 +251,7 @@ export function PipelineView() {
                 onApprove={handleApprove}
                 onReject={handleReject}
                 onViewRun={(runId) => setSelectedRunId(runId)}
+                onSelectStage={(name) => sidebarRef.current?.focusStage(name)}
               />
             ))}
           </div>

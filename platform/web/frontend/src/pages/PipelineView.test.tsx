@@ -165,6 +165,8 @@ describe('PipelineView', () => {
       { path: 'stages', type: 'dir' },
     ]);
     renderWithClient(<PipelineView />);
+    await waitFor(() => expect(screen.getByTestId('workspace-group-toggle')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('workspace-group-toggle'));
     await waitFor(() => expect(screen.getByTestId('file-tree-entry-shared/client-brief.md')).toBeInTheDocument());
     expect(screen.queryByTestId('file-tree-entry-shared')).not.toBeInTheDocument();
   });
@@ -175,6 +177,8 @@ describe('PipelineView', () => {
     vi.mocked(getFile).mockResolvedValue({ path: 'shared/client-brief.md', content: '# Client Brief' });
     renderWithClient(<PipelineView />);
 
+    await waitFor(() => expect(screen.getByTestId('workspace-group-toggle')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('workspace-group-toggle'));
     await waitFor(() => expect(screen.getByTestId('file-tree-entry-shared/client-brief.md')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('file-tree-entry-shared/client-brief.md'));
 
@@ -189,6 +193,8 @@ describe('PipelineView', () => {
     vi.mocked(putFile).mockResolvedValue(undefined);
     renderWithClient(<PipelineView />);
 
+    await waitFor(() => expect(screen.getByTestId('workspace-group-toggle')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('workspace-group-toggle'));
     await waitFor(() => expect(screen.getByTestId('file-tree-entry-shared/client-brief.md')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('file-tree-entry-shared/client-brief.md'));
     await waitFor(() => expect(screen.getByTestId('markdown-viewer')).toBeInTheDocument());
@@ -221,6 +227,8 @@ describe('PipelineView', () => {
     renderWithClient(<PipelineView />);
 
     // Select file A, enter edit mode, edit it, and kick off a save that stays in flight.
+    await waitFor(() => expect(screen.getByTestId('workspace-group-toggle')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('workspace-group-toggle'));
     await waitFor(() => expect(screen.getByTestId('file-tree-entry-a.md')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('file-tree-entry-a.md'));
     await waitFor(() => expect(screen.getByTestId('markdown-viewer')).toBeInTheDocument());
@@ -258,6 +266,8 @@ describe('PipelineView', () => {
     });
     renderWithClient(<PipelineView />);
 
+    await waitFor(() => expect(screen.getByTestId('workspace-group-toggle')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('workspace-group-toggle'));
     await waitFor(() => expect(screen.getByTestId('file-tree-entry-shared/client-brief.md')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('file-tree-entry-shared/client-brief.md'));
 
