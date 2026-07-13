@@ -6,5 +6,8 @@
     "mock-server",
     "server",
     "shared"
-  ]
+  ],
+  "devDependencies": {
+    "jsdom": "^25.0.0"
+  }
 }
