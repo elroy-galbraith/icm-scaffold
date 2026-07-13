@@ -108,9 +108,22 @@ describe('GET /api/tree, /api/diff, /api/log', () => {
   });
 
   it('GET /api/log treats a non-positive limit as invalid and falls back to 50', async () => {
+    // The 1-commit seed from beforeEach can't discriminate a clamp-to-50 fix
+    // from the old unvalidated behavior (both return 1 commit either way).
+    // Seed enough additional commits here, scoped to this test only, that
+    // "unbounded" (old, buggy) and "clamped to 50" (new, fixed) produce
+    // different response lengths: 55 total commits means old behavior
+    // returns 55 and new behavior returns exactly 50.
+    const { execFileSync } = await import('node:child_process');
+    for (let i = 0; i < 54; i++) {
+      writeFileSync(join(config.workspaceRoot, 'shared/client-brief.md'), `v${i}`);
+      execFileSync('git', ['add', '-A'], { cwd: config.workspaceRoot });
+      execFileSync('git', ['commit', '-m', `filler commit ${i}`], { cwd: config.workspaceRoot });
+    }
+
     const app = createApp(config);
     const res = await request(app).get('/api/log').query({ limit: '-5' });
     expect(res.status).toBe(200);
-    expect(res.body.length).toBeLessThanOrEqual(50);
+    expect(res.body).toHaveLength(50);
   });
 });
