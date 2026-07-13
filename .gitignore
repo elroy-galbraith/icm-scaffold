@@ -11,6 +11,7 @@ platform/runner/.env
 .runner.lock
 .runner/
 
+platform/web/node_modules/
 platform/web/mock-server/node_modules/
 platform/web/mock-server/dist/
 platform/web/server/node_modules/
@@ -19,6 +20,8 @@ platform/web/frontend/node_modules/
 platform/web/frontend/dist/
 platform/web/frontend/playwright-report/
 platform/web/frontend/test-results/
+platform/web/shared/node_modules/
+platform/web/shared/dist/
 
 # Session scratch (subagent-driven-development task briefs/reports/ledger)
 .superpowers/

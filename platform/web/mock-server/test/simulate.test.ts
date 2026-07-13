@@ -11,7 +11,7 @@ import {
   StageLockedError,
   DEFAULT_SIMULATED_DELAY_MS,
 } from '../src/simulate.js';
-import { readState, readLock, writeState, writeLock, readRunLog } from '../src/state.js';
+import { readState, readLock, writeState, writeLock, readRunLog } from 'icm-web-shared';
 
 function initGitRepo(dir: string): void {
   execFileSync('git', ['init'], { cwd: dir });

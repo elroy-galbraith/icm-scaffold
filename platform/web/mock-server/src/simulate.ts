@@ -13,8 +13,8 @@ import {
   type LockInfo,
   type RunLog,
   type ToolCallLogEntry,
-} from './state.js';
-import { commitWorkspace } from './git.js';
+} from 'icm-web-shared';
+import { commitWorkspace } from 'icm-web-shared';
 
 export const SIMULATED_MODEL = 'anthropic/claude-sonnet-5';
 export const SIMULATED_TOKEN_BUDGET = 200_000;

@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import type { WorkspaceConfig } from '../workspace.js';
+import type { WorkspaceRootConfig } from '../workspace.js';
 import { readRunLog } from '../state.js';
 
-// Run IDs are always server-generated via randomUUID() (see simulate.ts's beginStageRun).
-// Rejecting anything else before it reaches readRunLog's join() closes a directory-traversal
-// read (e.g. runId=..%2Fstate resolves to .runner/state.json instead of a run log).
+// Run IDs are always server-generated via randomUUID(). Rejecting anything else
+// before it reaches readRunLog's join() closes a directory-traversal read (e.g.
+// runId=..%2Fstate resolves to .runner/state.json instead of a run log).
 const RUN_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function createRunsRouter(config: WorkspaceConfig): Router {
+export function createRunsRouter(config: WorkspaceRootConfig): Router {
   const router = Router();
 
   router.param('runId', (req, res, next, runId) => {
@@ -19,7 +19,7 @@ export function createRunsRouter(config: WorkspaceConfig): Router {
   });
 
   router.get('/api/runs/:runId', (req, res) => {
-    const log = readRunLog(config.scratchDir, req.params.runId);
+    const log = readRunLog(config.workspaceRoot, req.params.runId);
     if (!log) {
       res.status(404).json({ error: 'Unknown run' });
       return;

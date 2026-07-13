@@ -13,23 +13,23 @@ describe('POST /api/_reset', () => {
   let config: WorkspaceConfig;
 
   beforeEach(() => {
-    const scratchDir = join(mkdtempSync(join(tmpdir(), 'route-reset-')), 'workspace');
-    config = { fixtureDir: FIXTURE_DIR, scratchDir, pendingStage: '03_report' };
+    const workspaceRoot = join(mkdtempSync(join(tmpdir(), 'route-reset-')), 'workspace');
+    config = { fixtureDir: FIXTURE_DIR, workspaceRoot, pendingStage: '03_report' };
     seedWorkspace(config);
   });
 
   afterEach(() => {
-    rmSync(config.scratchDir, { recursive: true, force: true });
+    rmSync(config.workspaceRoot, { recursive: true, force: true });
   });
 
   it('restores the seed state after the workspace has been mutated', async () => {
-    writeFileSync(join(config.scratchDir, 'stages/03_report/output/leftover.md'), 'stray file');
+    writeFileSync(join(config.workspaceRoot, 'stages/03_report/output/leftover.md'), 'stray file');
 
     const app = createApp(config);
     const res = await request(app).post('/api/_reset');
     expect(res.status).toBe(200);
 
-    expect(readdirSync(join(config.scratchDir, 'stages/03_report/output'))).toEqual([]);
+    expect(readdirSync(join(config.workspaceRoot, 'stages/03_report/output'))).toEqual([]);
 
     const pipeline = await request(app).get('/api/pipeline');
     expect(pipeline.body.stages.find((s: { name: string }) => s.name === '03_report').status).toBe('pending');

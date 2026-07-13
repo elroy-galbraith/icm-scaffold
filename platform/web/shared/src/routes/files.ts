@@ -1,13 +1,25 @@
 import { Router } from 'express';
 import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync, realpathSync } from 'node:fs';
 import { resolve, relative, isAbsolute, dirname, sep } from 'node:path';
-import type { WorkspaceConfig } from '../workspace.js';
+import type { WorkspaceRootConfig } from '../workspace.js';
 import { readLock } from '../state.js';
 import { commitWorkspace } from '../git.js';
 
 class PathEscapesWorkspaceError extends Error {}
 
+/**
+ * Resolve `relativePath` against `workspaceRoot`, rejecting anything that
+ * escapes the workspace either lexically (`..` segments) or via a symlink
+ * that points outside the workspace (checked by realpath-ing the nearest
+ * existing ancestor, since `candidate` itself may not exist yet — e.g. a
+ * new file for PUT). Returns the resolved absolute path plus the
+ * workspace-relative path (normalized), which callers should use for any
+ * further checks (e.g. `.runner/` protection) instead of the raw query
+ * string.
+ */
 function resolveWorkspacePath(workspaceRoot: string, relativePath: string): { absolute: string; relative: string } {
+  // Resolve the root itself in case it's reached via a symlink (e.g.
+  // macOS /tmp -> /private/tmp), so later comparisons are apples-to-apples.
   const root = realpathSync(workspaceRoot);
 
   if (isAbsolute(relativePath)) {
@@ -30,6 +42,11 @@ function assertInsideRoot(root: string, candidate: string, originalPath: string)
   }
 }
 
+/**
+ * Realpath the nearest existing ancestor of `candidate` and re-append the
+ * (necessarily `..`-free) remainder, so a not-yet-existing target path can
+ * still be checked for a symlink escape via one of its parent directories.
+ */
 function nearestRealPath(candidate: string): string {
   let current = candidate;
   while (!existsSync(current)) {
@@ -49,7 +66,7 @@ function isRunnerPath(workspaceRelativePath: string): boolean {
   return firstSegment === '.runner' || workspaceRelativePath === '.runner.lock';
 }
 
-export function createFilesRouter(config: WorkspaceConfig): Router {
+export function createFilesRouter(config: WorkspaceRootConfig): Router {
   const router = Router();
 
   router.get('/api/files', (req, res) => {

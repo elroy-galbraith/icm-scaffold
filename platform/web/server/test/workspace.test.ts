@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { seedRealWorkspace, listStageNames, checkStageOrder } from '../src/workspace.js';
-import { readState } from '../src/state.js';
+import { readState } from 'icm-web-shared';
 
 describe('seedRealWorkspace', () => {
   let workspaceRoot: string;

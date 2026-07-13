@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { seedWorkspace, type WorkspaceConfig } from '../../src/workspace.js';
-import { writeState, writeLock } from '../../src/state.js';
+import { writeState, writeLock } from 'icm-web-shared';
 
 const FIXTURE_DIR = fileURLToPath(new URL('../fixtures/meridian', import.meta.url));
 
@@ -34,13 +34,13 @@ describe('stage action routes', () => {
   let config: WorkspaceConfig;
 
   beforeEach(() => {
-    const scratchDir = join(mkdtempSync(join(tmpdir(), 'route-stage-')), 'workspace');
-    config = { fixtureDir: FIXTURE_DIR, scratchDir, pendingStage: '03_report' };
+    const workspaceRoot = join(mkdtempSync(join(tmpdir(), 'route-stage-')), 'workspace');
+    config = { fixtureDir: FIXTURE_DIR, workspaceRoot, pendingStage: '03_report' };
     seedWorkspace(config);
   });
 
   afterEach(() => {
-    rmSync(config.scratchDir, { recursive: true, force: true });
+    rmSync(config.workspaceRoot, { recursive: true, force: true });
   });
 
   it('POST run returns 202 immediately, then the stage transitions to awaiting_review', async () => {
@@ -59,7 +59,7 @@ describe('stage action routes', () => {
   });
 
   it('POST run returns 409 with the lock holder when the workspace is already locked', async () => {
-    writeLock(config.scratchDir, { runId: 'other', stage: '01_research', pid: 1, acquiredAt: '2026-07-12T09:00:00.000Z' });
+    writeLock(config.workspaceRoot, { runId: 'other', stage: '01_research', pid: 1, acquiredAt: '2026-07-12T09:00:00.000Z' });
     const app = createApp(config, { runDelayMs: 5 });
     const res = await request(app).post('/api/stages/03_report/run');
     expect(res.status).toBe(409);
@@ -68,7 +68,7 @@ describe('stage action routes', () => {
   });
 
   it('POST run returns 422 naming the blocking stage when ordering is violated', async () => {
-    writeState(config.scratchDir, {
+    writeState(config.workspaceRoot, {
       stages: {
         '01_research': { status: 'approved', updatedAt: '2026-07-12T09:00:00.000Z' },
         '02_analysis': { status: 'pending', updatedAt: '2026-07-12T09:00:00.000Z' },
@@ -90,7 +90,7 @@ describe('stage action routes', () => {
         '03_report': { status: 'awaiting_review' as const, updatedAt: '2026-07-12T09:00:00.000Z', lastRunId: 'seed-run' },
       },
     };
-    writeState(config.scratchDir, seededState);
+    writeState(config.workspaceRoot, seededState);
     const app = createApp(config, { runDelayMs: 5 });
 
     const res = await request(app).post('/api/stages/03_report/run');
@@ -105,7 +105,7 @@ describe('stage action routes', () => {
   });
 
   it('POST approve moves an awaiting_review stage to approved', async () => {
-    writeState(config.scratchDir, {
+    writeState(config.workspaceRoot, {
       stages: {
         '01_research': { status: 'approved', updatedAt: '2026-07-12T09:00:00.000Z' },
         '02_analysis': { status: 'awaiting_review', updatedAt: '2026-07-12T09:00:00.000Z' },
@@ -127,7 +127,7 @@ describe('stage action routes', () => {
   });
 
   it('POST reject stores the comment and returns 409 on a second attempt', async () => {
-    writeState(config.scratchDir, {
+    writeState(config.workspaceRoot, {
       stages: {
         '01_research': { status: 'approved', updatedAt: '2026-07-12T09:00:00.000Z' },
         '02_analysis': { status: 'awaiting_review', updatedAt: '2026-07-12T09:00:00.000Z' },

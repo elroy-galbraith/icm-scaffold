@@ -7,7 +7,7 @@ import express from 'express';
 import request from 'supertest';
 import { createStageActionsRouter } from '../../src/routes/stageActions.js';
 import { seedTestWorkspace } from '../helpers/seedTestWorkspace.js';
-import { writeState, writeLock, updateStageState } from '../../src/state.js';
+import { writeState, writeLock, updateStageState } from 'icm-web-shared';
 import type { WorkspaceConfig } from '../../src/workspace.js';
 import type { RunnerCli } from '../../src/runnerCli.js';
 

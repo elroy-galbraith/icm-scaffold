@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildPipelineView } from '../src/pipeline.js';
-import { writeState, writeLock, writeRunLog } from '../src/state.js';
+import { buildPipelineView, writeState, writeLock, writeRunLog } from 'icm-web-shared';
 
 describe('buildPipelineView', () => {
   let workspaceRoot: string;

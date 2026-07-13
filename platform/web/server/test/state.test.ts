@@ -14,7 +14,7 @@ import {
   SchemaValidationError,
   type RunLog,
   type LockInfo,
-} from '../src/state.js';
+} from 'icm-web-shared';
 
 function makeRunLog(overrides: Partial<RunLog> = {}): RunLog {
   return {

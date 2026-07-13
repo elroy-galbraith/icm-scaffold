@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import express from 'express';
 import request from 'supertest';
-import { createFilesRouter } from '../../src/routes/files.js';
+import { createFilesRouter } from 'icm-web-shared';
 import { seedTestWorkspace } from '../helpers/seedTestWorkspace.js';
 import type { WorkspaceConfig } from '../../src/workspace.js';
 

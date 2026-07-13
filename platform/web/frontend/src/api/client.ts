@@ -1,81 +1,33 @@
-export type StageStatus = 'pending' | 'awaiting_review' | 'approved' | 'rejected';
-export type RunStatus = 'completed' | 'aborted_budget' | 'error';
-
-export interface LastRunSummary {
-  runId: string;
-  status: RunStatus;
-  endedAt: string;
-  tokensSpent: number;
-  tokenBudget: number;
-  gateSummary?: string | null;
-  errorMessage?: string | null;
-}
-
-export interface LockView {
-  runId: string;
-  stage: string;
-  pid: number;
-  acquiredAt: string;
-}
-
-export interface StageView {
-  name: string;
-  status: StageStatus;
-  running: boolean;
-  comment?: string | null;
-  lastRun?: LastRunSummary | null;
-}
-
-export interface Pipeline {
-  locked: boolean;
-  lock?: LockView | null;
-  stages: StageView[];
-}
-
-export interface ToolCallLogEntry {
-  tool: 'read_file' | 'write_file' | 'list_dir' | 'finish_stage';
-  args: Record<string, unknown>;
-  result: 'ok' | 'error';
-  errorMessage?: string;
-  timestamp: string;
-}
-
-export interface RunLog {
-  runId: string;
-  stage: string;
-  model: string;
-  startedAt: string;
-  endedAt: string;
-  status: RunStatus;
-  filesRead: string[];
-  filesWritten: string[];
-  toolCalls: ToolCallLogEntry[];
-  tokensSpent: number;
-  tokenBudget: number;
-  gateSummary?: string;
-  errorMessage?: string;
-}
-
-export interface TreeEntry {
-  path: string;
-  type: 'file' | 'dir';
-}
+import type {
+  StageStatus,
+  RunStatus,
+  LastRunSummary,
+  StageView,
+  ToolCallLogEntry,
+  RunLog,
+  TreeEntry,
+  DiffResult,
+  LogEntry,
+  PipelineView as Pipeline,
+  LockInfo as LockView,
+} from 'icm-web-shared';
+export type {
+  StageStatus,
+  RunStatus,
+  LastRunSummary,
+  StageView,
+  ToolCallLogEntry,
+  RunLog,
+  TreeEntry,
+  DiffResult,
+  LogEntry,
+  Pipeline,
+  LockView,
+};
 
 export interface FileContent {
   path: string;
   content: string;
-}
-
-export interface DiffResult {
-  path: string;
-  ref: string;
-  diff: string;
-}
-
-export interface LogEntry {
-  sha: string;
-  message: string;
-  date: string;
 }
 
 export class ApiError extends Error {

@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import type { WorkspaceConfig } from '../workspace.js';
+import type { WorkspaceRootConfig } from '../workspace.js';
 import { getTree, getDiff, getLog, InvalidRefError } from '../git.js';
 
-export function createTreeDiffLogRouter(config: WorkspaceConfig): Router {
+export function createTreeDiffLogRouter(config: WorkspaceRootConfig): Router {
   const router = Router();
 
   router.get('/api/tree', (_req, res) => {
@@ -17,6 +17,9 @@ export function createTreeDiffLogRouter(config: WorkspaceConfig): Router {
       res.status(400).json({ error: 'path is required' });
       return;
     }
+    // Belt-and-suspenders: getDiff() enforces this too (the real security
+    // boundary, since it's what shells out to git), but rejecting here
+    // avoids the exception path for the common case of an obviously bad ref.
     if (ref.startsWith('-')) {
       res.status(400).json({ error: 'invalid ref' });
       return;
