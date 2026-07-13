@@ -6,7 +6,7 @@ import express from 'express';
 import request from 'supertest';
 import { createRunsRouter } from '../../src/routes/runs.js';
 import { seedTestWorkspace } from '../helpers/seedTestWorkspace.js';
-import { writeRunLog } from '../../src/state.js';
+import { writeRunLog } from 'icm-web-shared';
 import type { WorkspaceConfig } from '../../src/workspace.js';
 
 describe('GET /api/runs/:runId', () => {

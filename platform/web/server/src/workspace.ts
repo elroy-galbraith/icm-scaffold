@@ -11,7 +11,7 @@ import {
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { readState, type StageStatus } from './state.js';
+import { readState, type StageStatus } from 'icm-web-shared';
 
 export interface WorkspaceConfig {
   workspaceRoot: string;

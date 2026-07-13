@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync, realpathSync } from 'node:fs';
 import { resolve, relative, isAbsolute, dirname, sep } from 'node:path';
 import type { WorkspaceConfig } from '../workspace.js';
-import { readLock } from '../state.js';
+import { readLock } from 'icm-web-shared';
 import { commitWorkspace } from '../git.js';
 
 class PathEscapesWorkspaceError extends Error {}

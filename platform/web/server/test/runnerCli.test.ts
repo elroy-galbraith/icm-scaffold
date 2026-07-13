@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRunnerCli, loadOpenRouterApiKey } from '../src/runnerCli.js';
-import { readState } from '../src/state.js';
+import { readState } from 'icm-web-shared';
 
 // test/runnerCli.test.ts -> platform/runner is a sibling of web/ (same depth as
 // src/runnerCli.ts's own RUNNER_DIR, since test/ and src/ sit at the same level).

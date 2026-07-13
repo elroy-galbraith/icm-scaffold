@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { seedWorkspace, type WorkspaceConfig } from '../../src/workspace.js';
-import { writeLock } from '../../src/state.js';
+import { writeLock } from 'icm-web-shared';
 
 const FIXTURE_DIR = fileURLToPath(new URL('../fixtures/meridian', import.meta.url));
 

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { seedWorkspace, type WorkspaceConfig } from '../../src/workspace.js';
-import { writeRunLog } from '../../src/state.js';
+import { writeRunLog } from 'icm-web-shared';
 
 const FIXTURE_DIR = fileURLToPath(new URL('../fixtures/meridian', import.meta.url));
 

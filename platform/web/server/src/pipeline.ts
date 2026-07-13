@@ -1,5 +1,5 @@
 import { listStageNames } from './workspace.js';
-import { readState, readLock, readRunLog, type StageStatus, type RunStatus, type LockInfo } from './state.js';
+import { readState, readLock, readRunLog, type StageStatus, type RunStatus, type LockInfo } from 'icm-web-shared';
 
 export interface LastRunSummary {
   runId: string;

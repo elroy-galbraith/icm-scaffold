@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { WorkspaceConfig } from '../workspace.js';
-import { readRunLog } from '../state.js';
+import { readRunLog } from 'icm-web-shared';
 
 // Run IDs are always server-generated via randomUUID(). Rejecting anything else
 // before it reaches readRunLog's join() closes a directory-traversal read (e.g.

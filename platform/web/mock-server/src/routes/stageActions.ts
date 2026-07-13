@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { STAGE_NAME_PATTERN, type WorkspaceConfig } from '../workspace.js';
 import { beginStageRun, completeStageRun, StageBlockedError, StageLockedError } from '../simulate.js';
-import { readState, updateStageState, type StageStatus } from '../state.js';
+import { readState, updateStageState, type StageStatus } from 'icm-web-shared';
 import { commitWorkspace } from '../git.js';
 
 function getStageStatus(config: WorkspaceConfig, stage: string): StageStatus {
