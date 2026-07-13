@@ -116,6 +116,48 @@ and documented comparables. This sells to the bank's risk function, not against 
 
 ---
 
+## Competitive landscape (positioning, not dunking)
+
+Three categories get compared to this platform. Each solves a different layer;
+misidentifying the layer loses the deal.
+
+### n8n / Zapier / Make — integration orchestration
+
+The program is a node graph moving data between systems. Excellent at high-volume,
+event-driven plumbing, with real HITL support (approval steps on agent tool calls,
+wait nodes) and enterprise audit logs. Take them seriously. The differences are
+specific:
+
+| Audit question | n8n answers | This platform answers |
+|---|---|---|
+| Who approved which action, when? | Yes — action-level logs | Yes — git commits |
+| Does this figure trace to a source document? | No claim-level equivalent | `[Sn]` citations + `audit.md` trace table |
+| How did the process definition change between March and June? | Diff a JSON node graph (unreadable in practice) | Diff prose contracts — legible to the process owner |
+| What do we keep if we leave? | Exported JSON, meaningless without n8n | The folder — still readable SOP documentation |
+
+**Positioning line:** *n8n automates data movement; we automate judgment work under
+supervision.* Complementary, not rival — n8n is a fine way to feed a stage's `input/`
+folder or fan out an approved report, and many clients already run it. Pitch
+alongside, never against. Concede outright: high-volume, low-judgment, no-document
+workflows belong in n8n (see "Where ICM does not fit").
+
+### LangChain / CrewAI / AutoGen — developer frameworks
+
+Orchestration expressed in code, owned by engineers. This is what the ICM paper
+explicitly positions against: the process definition migrates out of documents into a
+codebase the process owner can't read or change, plus framework churn. Not a
+competitor for our buyer — it's what a client's dev team might build instead of
+buying anything. Counter: total cost of ownership (maintenance, key-person risk) and
+"who in your risk function can read the workflow definition?"
+
+### Vertical AI point solutions (per-domain underwriting/compliance tools)
+
+Strong in their niche, opaque by design, and lock the process into the vendor's
+model of it. Counter with the exit story and the fact that the client's own SOP
+remains the source of truth here. Watch for these in the RBF space specifically —
+they'll have deeper domain features; our edge is auditability + process ownership,
+not feature count.
+
 ## Where ICM does not fit (say this proactively — it builds trust)
 
 - Real-time or high-volume low-latency decisioning (fraud scoring, instant approvals)
