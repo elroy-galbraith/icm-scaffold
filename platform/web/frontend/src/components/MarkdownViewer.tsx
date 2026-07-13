@@ -11,5 +11,11 @@ export function MarkdownViewer({ content }: MarkdownViewerProps) {
   // have been LLM-generated or edited by a client, so untrusted markup (e.g. <script>,
   // onerror handlers) must be stripped before it reaches the DOM.
   const html = DOMPurify.sanitize(rawHtml);
-  return <div data-testid="markdown-viewer" dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <div
+      data-testid="markdown-viewer"
+      className="prose prose-sm max-w-none text-ink prose-headings:font-serif prose-headings:text-ink prose-a:text-ink"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }
