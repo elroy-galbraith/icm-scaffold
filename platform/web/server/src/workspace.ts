@@ -1,17 +1,10 @@
-import {
-  existsSync,
-  mkdirSync,
-  rmSync,
-  cpSync,
-  readdirSync,
-  statSync,
-  writeFileSync,
-  readFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, rmSync, cpSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { readState, type StageStatus } from 'icm-web-shared';
+import { listStageNames, readState, type StageStatus } from 'icm-web-shared';
+
+export { STAGE_NAME_PATTERN, listStageNames } from 'icm-web-shared';
 
 export interface WorkspaceConfig {
   workspaceRoot: string;
@@ -22,8 +15,6 @@ export interface StageBlock {
   blockingStatus: StageStatus;
 }
 
-export const STAGE_NAME_PATTERN = /^[0-9]{2}_[a-z0-9_]+$/;
-
 // platform/web/server/src/workspace.ts -> repo root is four levels up.
 const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const EXAMPLE_DIR = join(REPO_ROOT, 'examples', 'meridian-support-automation');
@@ -33,14 +24,6 @@ const WORKSPACE_CLAUDE_MD = readFileSync(
 );
 
 const APPROVED_ON_SEED = ['01_research', '02_analysis'];
-
-export function listStageNames(workspaceRoot: string): string[] {
-  const stagesDir = join(workspaceRoot, 'stages');
-  if (!existsSync(stagesDir)) return [];
-  return readdirSync(stagesDir)
-    .filter((name) => STAGE_NAME_PATTERN.test(name) && statSync(join(stagesDir, name)).isDirectory())
-    .sort();
-}
 
 export function checkStageOrder(workspaceRoot: string, stage: string): StageBlock | null {
   const state = readState(workspaceRoot);
@@ -60,11 +43,9 @@ export function seedRealWorkspace(workspaceRoot: string): void {
   }
   mkdirSync(workspaceRoot, { recursive: true });
 
-  // 1. Real stage contracts (CONTEXT.md + references/) from the repo root.
   cpSync(join(REPO_ROOT, 'stages'), join(workspaceRoot, 'stages'), { recursive: true });
   cpSync(join(REPO_ROOT, 'CONTEXT.md'), join(workspaceRoot, 'CONTEXT.md'));
 
-  // 2. Configured engagement data + completed output from the worked example.
   mkdirSync(join(workspaceRoot, '_config'), { recursive: true });
   cpSync(join(REPO_ROOT, '_config', 'conventions.md'), join(workspaceRoot, '_config', 'conventions.md'));
   cpSync(join(EXAMPLE_DIR, '_config', 'voice.md'), join(workspaceRoot, '_config', 'voice.md'));
@@ -76,14 +57,9 @@ export function seedRealWorkspace(workspaceRoot: string): void {
       { recursive: true }
     );
   }
-  // 03_report/output stays whatever `stages/` (step 1) shipped — empty but for
-  // .gitkeep — so it's the pending stage.
 
-  // 3. A workspace CLAUDE.md curated for this seed (see assets/workspace-claude.md).
   writeFileSync(join(workspaceRoot, 'CLAUDE.md'), WORKSPACE_CLAUDE_MD);
 
-  // 4. Stage state: earlier stages approved, 03_report absent (= pending, per
-  // contracts/state-machine.md's "a stage absent from state.json is pending" rule).
   const now = new Date().toISOString();
   const stages: Record<string, { status: StageStatus; updatedAt: string }> = {};
   for (const name of APPROVED_ON_SEED) {

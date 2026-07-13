@@ -1,8 +1,11 @@
-import { existsSync, mkdirSync, rmSync, cpSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, cpSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { listStageNames } from 'icm-web-shared';
+
+export { STAGE_NAME_PATTERN, listStageNames } from 'icm-web-shared';
 
 export interface WorkspaceConfig {
   fixtureDir: string;
@@ -15,16 +18,6 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   scratchDir: join(tmpdir(), 'icm-web-mock-workspace'),
   pendingStage: '03_report',
 };
-
-export const STAGE_NAME_PATTERN = /^[0-9]{2}_[a-z0-9_]+$/;
-
-export function listStageNames(scratchDir: string): string[] {
-  const stagesDir = join(scratchDir, 'stages');
-  if (!existsSync(stagesDir)) return [];
-  return readdirSync(stagesDir)
-    .filter((name) => STAGE_NAME_PATTERN.test(name) && statSync(join(stagesDir, name)).isDirectory())
-    .sort();
-}
 
 export function seedWorkspace(config: WorkspaceConfig): void {
   const { fixtureDir, scratchDir, pendingStage } = config;
