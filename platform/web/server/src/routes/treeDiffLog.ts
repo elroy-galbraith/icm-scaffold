@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { WorkspaceConfig } from '../workspace.js';
-import { getTree, getDiff, getLog, InvalidRefError } from '../git.js';
+import { getTree, getDiff, getLog, InvalidRefError } from 'icm-web-shared';
 
 export function createTreeDiffLogRouter(config: WorkspaceConfig): Router {
   const router = Router();

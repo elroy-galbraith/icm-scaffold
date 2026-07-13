@@ -3,7 +3,7 @@ import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync, realpathS
 import { resolve, relative, isAbsolute, dirname, sep } from 'node:path';
 import type { WorkspaceConfig } from '../workspace.js';
 import { readLock } from 'icm-web-shared';
-import { commitWorkspace } from '../git.js';
+import { commitWorkspace } from 'icm-web-shared';
 
 class PathEscapesWorkspaceError extends Error {}
 

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { STAGE_NAME_PATTERN, checkStageOrder, type WorkspaceConfig } from '../workspace.js';
 import { readState, readLock, type StageStatus } from 'icm-web-shared';
 import { defaultRunnerCli, type RunnerCli } from '../runnerCli.js';
-import { commitWorkspace } from '../git.js';
+import { commitWorkspace } from 'icm-web-shared';
 
 function getStageStatus(config: WorkspaceConfig, stage: string): StageStatus {
   const state = readState(config.workspaceRoot);

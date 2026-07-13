@@ -14,7 +14,7 @@ import {
   type RunLog,
   type ToolCallLogEntry,
 } from 'icm-web-shared';
-import { commitWorkspace } from './git.js';
+import { commitWorkspace } from 'icm-web-shared';
 
 export const SIMULATED_MODEL = 'anthropic/claude-sonnet-5';
 export const SIMULATED_TOKEN_BUDGET = 200_000;
