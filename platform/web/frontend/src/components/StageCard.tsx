@@ -58,9 +58,9 @@ export function StageCard({
         type="button"
         data-testid={`stagecard-header-${stage.name}`}
         onClick={() => onSelectStage?.(stage.name)}
-        className="flex w-full items-center justify-between gap-2 text-left"
+        className="flex w-full items-center justify-between gap-2 text-left focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
       >
-        <h2 className="font-serif text-base font-bold text-ink">{stage.name}</h2>
+        <span className="font-serif text-base font-bold text-ink">{stage.name}</span>
         <Badge tone={STATUS_TONE[stage.status]} data-testid={`stagecard-status-${stage.name}`}>
           {stage.status}
         </Badge>

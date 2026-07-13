@@ -11,7 +11,6 @@ import {
   getDiff,
   getRun,
   ApiError,
-  type StageStatus,
 } from '../api/client.js';
 import { computeBlockedBy } from '../lib/pipelineStatus.js';
 import { StageCard } from '../components/StageCard.js';
