@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { cn } from '../../lib/cn.js';
 
@@ -10,13 +10,23 @@ export interface SheetProps {
 }
 
 export function Sheet({ open, onOpenChange, title, children }: SheetProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus();
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onOpenChange(false);
     };
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [open, onOpenChange]);
 
   if (!open) return null;
@@ -30,10 +40,14 @@ export function Sheet({ open, onOpenChange, title, children }: SheetProps) {
         aria-hidden="true"
       />
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cn('relative flex h-full w-full max-w-md flex-col border-l border-border bg-canvas shadow-xl')}
+        className={cn(
+          'relative flex h-full w-full max-w-md flex-col border-l border-border bg-canvas shadow-xl outline-none'
+        )}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h3 className="font-serif text-lg font-bold text-ink">{title}</h3>

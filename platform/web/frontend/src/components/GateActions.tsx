@@ -28,6 +28,7 @@ export function GateActions({ stage, disabled, onApprove, onReject }: GateAction
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         placeholder="Reason for rejecting"
+        aria-label="Reason for rejecting"
         className="w-full rounded border border-border bg-white px-2 py-1.5 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-ink"
       />
       <Button

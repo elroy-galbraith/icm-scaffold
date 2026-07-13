@@ -13,9 +13,10 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   destructive: 'bg-white text-status-rejected border-status-rejected hover:bg-status-rejected-bg',
 };
 
-export function Button({ variant = 'secondary', className, ...props }: ButtonProps) {
+export function Button({ variant = 'secondary', type = 'button', className, ...props }: ButtonProps) {
   return (
     <button
+      type={type}
       className={cn(
         'inline-flex items-center justify-center rounded border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-50',
         VARIANT_CLASSES[variant],

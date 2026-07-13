@@ -206,6 +206,8 @@ export function PipelineView() {
           {toasts.map((toast) => (
             <div
               key={toast.id}
+              role="status"
+              aria-live="polite"
               data-testid={`toast-${toast.id}`}
               className="flex items-start justify-between gap-3 rounded border border-status-rejected bg-white px-4 py-3 text-xs text-status-rejected shadow-md"
             >
