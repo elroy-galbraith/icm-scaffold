@@ -96,7 +96,11 @@ export const WorkspaceSidebar = forwardRef<WorkspaceSidebarHandle, WorkspaceSide
             key={group.stage}
             data-testid={`stage-group-${group.stage}`}
             ref={(el) => {
-              if (el) sectionRefs.current.set(group.stage, el);
+              if (el) {
+                sectionRefs.current.set(group.stage, el);
+              } else {
+                sectionRefs.current.delete(group.stage);
+              }
             }}
             className="mb-3"
           >

@@ -54,17 +54,19 @@ export function StageCard({
 
   return (
     <Card data-testid={`stagecard-${stage.name}`} className="flex min-w-[220px] flex-1 flex-col gap-2 p-4">
-      <button
-        type="button"
-        data-testid={`stagecard-header-${stage.name}`}
-        onClick={() => onSelectStage?.(stage.name)}
-        className="flex w-full items-center justify-between gap-2 text-left focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
-      >
-        <span className="font-serif text-base font-bold text-ink">{stage.name}</span>
-        <Badge tone={STATUS_TONE[stage.status]} data-testid={`stagecard-status-${stage.name}`}>
-          {stage.status}
-        </Badge>
-      </button>
+      <h2 className="font-serif text-base font-bold text-ink">
+        <button
+          type="button"
+          data-testid={`stagecard-header-${stage.name}`}
+          onClick={() => onSelectStage?.(stage.name)}
+          className="flex w-full items-center justify-between gap-2 text-left focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+        >
+          <span>{stage.name}</span>
+          <Badge tone={STATUS_TONE[stage.status]} data-testid={`stagecard-status-${stage.name}`}>
+            {stage.status}
+          </Badge>
+        </button>
+      </h2>
 
       {stage.running && (
         <span data-testid={`stagecard-running-${stage.name}`} className="text-xs text-muted">
