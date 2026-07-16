@@ -37,19 +37,31 @@ If `shared/client-brief.md` still contains placeholder text, offer to run setup:
 walk the user through `setup/questionnaire.md` and write their answers into
 `shared/client-brief.md` and `_config/voice.md` before running any stage.
 
-## Worktree identity: web UI sub-project (Layer 0 override)
+## Worktree identity: platform build-out (Layer 0 override)
 
 This worktree (`worktree-icm-web`) is **not** doing ICM report-pipeline work. It builds
-the web UI product described in `docs/mvp-spec.md` §4, per:
+the ICM platform product described in `docs/mvp-spec.md`, `docs/delivery-model.md`, and
+(as of 2026-07-16) the **schedules & channels** extension — recurring stage execution and
+remote/authenticated interaction, scoped deliberately narrower than Vercel's `eve`
+framework (prior art, not a template to copy — see chat history for the comparison and
+design tradeoffs, esp. "a schedule triggers `run`, never `approve`").
 
 - **Design:** `docs/superpowers/specs/2026-07-12-web-ui-design.md`
 - **Plan:** `docs/superpowers/plans/2026-07-12-web-ui.md` — execute task-by-task via
-  `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
-- **Scope:** `platform/web/frontend/` (React+Vite+TS SPA) and
-  `platform/web/mock-server/` (Node+Express+TS mock of `contracts/openapi.yaml`,
-  seeded from `examples/meridian-support-automation`).
+  `superpowers:subagent-driven-development` or `superpowers:executing-plans` (both cover
+  the original web-UI slice only; schedules/channels predate a written plan doc — treat
+  `contracts/` + this file as the source of truth until one exists).
+- **Scope:** `platform/web/frontend/` (React+Vite+TS SPA), `platform/web/server/` (the
+  **live** Node+Express+TS server implementing `contracts/openapi.yaml` — build and test
+  against this one), `platform/runner/` (schedules/channels are runner-adjacent
+  primitives — a schedule/channel only ever calls the same `run`/`approve`/`reject`
+  actions the CLI already exposes), and `contracts/` itself.
+- `platform/web/mock-server/` is a frontend-only fixture for offline UI dev. It is **not**
+  the target for backend work and may lag behind `contracts/` — don't treat its behavior
+  as authoritative.
 
-**Read `contracts/` first. It is frozen and read-only for this worktree.** If an
-implementation choice here doesn't fit a contract, STOP and ask — never modify
-`contracts/` to fit the code. Do not import code from `platform/runner/`; the only
-shared interface between worktrees is `contracts/`.
+**`contracts/` is a live, shared interface now, not frozen.** Extend it deliberately: one
+schema per concern (see `contracts/README.md`'s table), additive over breaking where
+possible, and keep `state-machine.md` in sync with any new transition or trigger source.
+If a change would be genuinely breaking (not additive), STOP and ask before making it —
+that bar still applies, it's just no longer "never touch this file."
