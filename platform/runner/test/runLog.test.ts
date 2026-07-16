@@ -55,4 +55,16 @@ describe('runLog', () => {
     const log = readLatestRunLog(workspaceRoot, '01_research');
     expect(log?.runId).toBe('run-1');
   });
+
+  it('round-trips an optional trigger', () => {
+    writeRunLog(workspaceRoot, makeLog({ runId: 'run-1', trigger: { type: 'schedule', source: 'nightly' } }));
+    const log = readLatestRunLog(workspaceRoot);
+    expect(log?.trigger).toEqual({ type: 'schedule', source: 'nightly' });
+  });
+
+  it('omits trigger entirely when not given, rather than writing it as null', () => {
+    writeRunLog(workspaceRoot, makeLog({ runId: 'run-1' }));
+    const log = readLatestRunLog(workspaceRoot);
+    expect(log && 'trigger' in log).toBe(false);
+  });
 });

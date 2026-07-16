@@ -24,6 +24,14 @@ export interface WorkspaceState {
 
 export type RunStatus = 'completed' | 'aborted_budget' | 'error';
 
+export type TriggerType = 'manual' | 'schedule' | 'channel';
+
+export interface RunTrigger {
+  type: TriggerType;
+  /** Schedule id (schedules.config.json) or channel id (channels.config.json). Absent for manual. */
+  source?: string;
+}
+
 export interface ToolCallLogEntry {
   tool: 'read_file' | 'write_file' | 'list_dir' | 'finish_stage';
   args: Record<string, unknown>;
@@ -46,6 +54,7 @@ export interface RunLog {
   tokenBudget: number;
   gateSummary?: string;
   errorMessage?: string;
+  trigger?: RunTrigger;
 }
 
 export interface LockInfo {

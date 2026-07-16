@@ -56,6 +56,22 @@ To display "last run failed":
 3. If `status` is `error` or `aborted_budget`, render the failure (message, tokens
    spent vs budget) alongside the `pending` stage status.
 
+## Trigger sources (who caused a `run`)
+
+A run's `trigger` (see `schemas/run-log.schema.json`) is one of:
+
+| Type | Source of the call | Notes |
+|---|---|---|
+| `manual` | Human via CLI or web UI "Run stage N" | Default when `trigger` is omitted (incl. all pre-2026-07-16 run logs) |
+| `schedule` | `schedules.config.json` cron entry, checked by the web server's scheduler tick | `source` = schedule `id`. Only ever calls `run` — see contracts/README.md |
+| `channel` | `POST /api/channels/{id}/actions` | `source` = channel `id`. May call `run`, `status`, `approve`, or `reject`, scoped by that channel's `allowedActions` |
+
+Trigger type does not change the state machine above — a schedule- or channel-triggered
+`run` follows exactly the same `pending → awaiting_review` transition as a manual one, and
+a channel-triggered `approve`/`reject` follows exactly the same
+`awaiting_review → approved/rejected` transition a human clicking the web UI button would.
+Nothing about *how* a transition was requested changes *what* the transition is.
+
 ## Stage-ordering policy (enforced by the runner)
 
 `runner run NN_x` requires every stage with a lower numeric prefix to be `approved`.
