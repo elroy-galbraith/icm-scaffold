@@ -39,6 +39,19 @@
     "tokensSpent": { "type": "integer", "minimum": 0 },
     "tokenBudget": { "type": "integer", "minimum": 0 },
     "gateSummary": { "type": "string", "description": "Model-written summary + Verify checklist shown to the reviewer" },
-    "errorMessage": { "type": "string" }
+    "errorMessage": { "type": "string" },
+    "trigger": {
+      "type": "object",
+      "description": "What caused this run. Omitted for runs written before this field existed — treat a missing trigger the same as type=manual.",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["manual", "schedule", "channel"] },
+        "source": {
+          "type": "string",
+          "description": "The schedule id (schedules.config.json) or channel id (channels.config.json) that triggered this run. Absent for manual."
+        }
+      }
+    }
   }
 }

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "icm/channel-config",
+  "title": "ChannelConfig",
+  "description": "Contents of <workspace>/channels.config.json. Human-editable: named remote entry points that map to the same run/status/approve/reject actions the web UI and CLI already call. Never store a secret in this file — `tokenEnvVar` names an environment variable the server reads at request time.",
+  "type": "object",
+  "required": ["channels"],
+  "additionalProperties": false,
+  "properties": {
+    "channels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "tokenEnvVar", "allowedActions", "enabled"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Unique within this file. Path segment: POST /api/channels/{id}/actions."
+          },
+          "kind": {
+            "enum": ["http"],
+            "description": "Transport adapter. Only a bare authenticated-HTTP channel ships today; future adapters (slack, discord, email, ...) get their own `kind` and translate their native message shape into the same action call — they don't need a new action surface."
+          },
+          "tokenEnvVar": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the environment variable holding this channel's bearer token. The token value itself must never be written to this file."
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": { "enum": ["run", "status", "approve", "reject"] },
+            "description": "Scopes what this channel may do. A read-only status bot should list just [\"status\"]."
+          },
+          "enabled": { "type": "boolean" },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}

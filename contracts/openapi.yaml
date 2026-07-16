@@ -165,6 +165,91 @@ paths:
                     message: { type: string }
                     date: { type: string, format: date-time }
 
+  /api/schedules:
+    get:
+      summary: List configured schedules (schedules.config.json)
+      operationId: listSchedules
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScheduleConfig" }
+    put:
+      summary: >
+        Replace the full schedule list. A schedule only ever calls the same action a
+        human's "Run stage N" click performs (POST /api/stages/{stage}/run) — it can
+        never approve or reject a gate.
+      operationId: replaceSchedules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ScheduleConfig" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScheduleConfig" }
+        "422": { description: "Invalid schedule config: bad cron expression, unknown stage, or duplicate id" }
+
+  /api/channels:
+    get:
+      summary: List configured channels (channels.config.json) — tokenEnvVar names only, never secret values
+      operationId: listChannels
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelConfig" }
+    put:
+      summary: Replace the full channel list
+      operationId: replaceChannels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChannelConfig" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelConfig" }
+        "422": { description: "Invalid channel config" }
+
+  /api/channels/{channelId}/actions:
+    post:
+      summary: >
+        Remote entry point for channel adapters (a bare authenticated-HTTP caller today;
+        Slack/Discord/etc. adapters translate their own message shape into this same
+        call). Authenticated via `Authorization: Bearer <token>`, checked against the
+        channel's configured tokenEnvVar. Dispatches to the same run/status/approve/reject
+        logic as the stage-scoped endpoints below — a channel cannot do anything a human
+        in the web UI couldn't also do, and can never bypass a gate.
+      operationId: channelAction
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { enum: [run, status, approve, reject] }
+                stage: { type: string, description: "Required for run/approve/reject" }
+                comment: { type: string, description: "Required for reject" }
+      responses:
+        "200": { description: "Action result — shape matches the equivalent /api/stages/... response, or Pipeline for status" }
+        "401": { description: "Missing or invalid bearer token" }
+        "403": { description: "Action not in this channel's allowedActions, or channel disabled" }
+        "404": { description: "Unknown channel" }
+        "409": { $ref: "#/components/responses/Locked" }
+        "422": { description: "Blocked by stage ordering, missing comment, or unknown action" }
+
 components:
   parameters:
     Stage:
@@ -251,3 +336,42 @@ components:
       properties:
         path: { type: string }
         type: { enum: [file, dir] }
+
+    ScheduleConfig:
+      description: See contracts/schemas/schedule-config.schema.json (authoritative)
+      type: object
+      required: [schedules]
+      properties:
+        schedules:
+          type: array
+          items: { $ref: "#/components/schemas/Schedule" }
+    Schedule:
+      type: object
+      required: [id, stage, cron, enabled]
+      properties:
+        id: { type: string }
+        stage: { type: string }
+        cron: { type: string }
+        enabled: { type: boolean }
+        description: { type: string }
+
+    ChannelConfig:
+      description: See contracts/schemas/channel-config.schema.json (authoritative)
+      type: object
+      required: [channels]
+      properties:
+        channels:
+          type: array
+          items: { $ref: "#/components/schemas/Channel" }
+    Channel:
+      type: object
+      required: [id, kind, tokenEnvVar, allowedActions, enabled]
+      properties:
+        id: { type: string }
+        kind: { enum: [http] }
+        tokenEnvVar: { type: string }
+        allowedActions:
+          type: array
+          items: { enum: [run, status, approve, reject] }
+        enabled: { type: boolean }
+        description: { type: string }
