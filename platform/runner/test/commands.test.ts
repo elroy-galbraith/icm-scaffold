@@ -9,6 +9,7 @@ import { statusCommand } from '../src/commands/status.js';
 import { approveCommand } from '../src/commands/approve.js';
 import { rejectCommand } from '../src/commands/reject.js';
 import { readState, updateStageState } from '../src/state.js';
+import { readLatestRunLog } from '../src/runLog.js';
 import type { ChatCompletionFn, ChatCompletionResult } from '../src/openrouter.js';
 
 const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/workspace', import.meta.url));
@@ -126,6 +127,69 @@ describe('CLI commands', () => {
 
   it('statusCommand runs without throwing when no runs exist yet', () => {
     expect(() => statusCommand(workspaceRoot)).not.toThrow();
+  });
+
+  it('runCommand with no trigger writes no trigger to the run log and uses the plain commit message', async () => {
+    const chat = scriptedChat([
+      {
+        toolCalls: [
+          { name: 'write_file', args: { path: 'stages/01_research/output/findings.md', content: '# Findings\n' } },
+        ],
+        totalTokens: 10,
+      },
+      { toolCalls: [{ name: 'finish_stage', args: { gateSummary: 'Done. Verify: ok.' } }], totalTokens: 10 },
+    ]);
+
+    await runCommand(workspaceRoot, '01_research', { chatCompletionFn: chat });
+
+    const log = readLatestRunLog(workspaceRoot, '01_research');
+    expect(log?.trigger).toBeUndefined();
+    const subject = execFileSync('git', ['log', '-1', '--pretty=%s'], { cwd: workspaceRoot }).toString().trim();
+    expect(subject).toMatch(/^stage 01_research: run .+ \(completed\)$/);
+  });
+
+  it('runCommand records a schedule trigger in the run log and the commit message', async () => {
+    const chat = scriptedChat([
+      {
+        toolCalls: [
+          { name: 'write_file', args: { path: 'stages/01_research/output/findings.md', content: '# Findings\n' } },
+        ],
+        totalTokens: 10,
+      },
+      { toolCalls: [{ name: 'finish_stage', args: { gateSummary: 'Done. Verify: ok.' } }], totalTokens: 10 },
+    ]);
+
+    await runCommand(workspaceRoot, '01_research', {
+      chatCompletionFn: chat,
+      trigger: { type: 'schedule', source: 'weekly-monday' },
+    });
+
+    const log = readLatestRunLog(workspaceRoot, '01_research');
+    expect(log?.trigger).toEqual({ type: 'schedule', source: 'weekly-monday' });
+    const subject = execFileSync('git', ['log', '-1', '--pretty=%s'], { cwd: workspaceRoot }).toString().trim();
+    expect(subject).toMatch(/^stage 01_research: run .+ \(completed\) \[schedule:weekly-monday\]$/);
+  });
+
+  it('runCommand records a channel trigger with no source', async () => {
+    const chat = scriptedChat([
+      {
+        toolCalls: [
+          { name: 'write_file', args: { path: 'stages/01_research/output/findings.md', content: '# Findings\n' } },
+        ],
+        totalTokens: 10,
+      },
+      { toolCalls: [{ name: 'finish_stage', args: { gateSummary: 'Done. Verify: ok.' } }], totalTokens: 10 },
+    ]);
+
+    await runCommand(workspaceRoot, '01_research', {
+      chatCompletionFn: chat,
+      trigger: { type: 'channel' },
+    });
+
+    const log = readLatestRunLog(workspaceRoot, '01_research');
+    expect(log?.trigger).toEqual({ type: 'channel' });
+    const subject = execFileSync('git', ['log', '-1', '--pretty=%s'], { cwd: workspaceRoot }).toString().trim();
+    expect(subject).toMatch(/^stage 01_research: run .+ \(completed\) \[channel\]$/);
   });
 
   it('clears a stale rejection comment once the stage is successfully re-run', async () => {

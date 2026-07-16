@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { acquireLock, releaseLock } from '../lock.js';
 import { runAgentLoop } from '../agentLoop.js';
 import type { ChatCompletionFn } from '../openrouter.js';
-import { writeRunLog } from '../runLog.js';
+import { writeRunLog, type RunTrigger } from '../runLog.js';
 import { commitWorkspace } from '../git.js';
 import { updateStageState } from '../state.js';
 import { checkStageOrder } from '../stageOrder.js';
@@ -11,6 +11,16 @@ import { loadConfig } from '../config.js';
 export interface RunCommandDeps {
   chatCompletionFn?: ChatCompletionFn;
   force?: boolean;
+  /** Who/what asked for this run. Omitted means a human via CLI/UI — see contracts/state-machine.md. */
+  trigger?: RunTrigger;
+}
+
+function commitMessage(stage: string, runId: string, status: string, trigger?: RunTrigger): string {
+  if (!trigger || trigger.type === 'manual') {
+    return `stage ${stage}: run ${runId} (${status})`;
+  }
+  const source = trigger.source ? `:${trigger.source}` : '';
+  return `stage ${stage}: run ${runId} (${status}) [${trigger.type}${source}]`;
 }
 
 export class StageOrderBlockedError extends Error {
@@ -51,7 +61,7 @@ export async function runCommand(workspaceRoot: string, stage: string, deps: Run
     });
     const endedAt = new Date().toISOString();
 
-    commitWorkspace(workspaceRoot, `stage ${stage}: run ${runId} (${result.status})`);
+    commitWorkspace(workspaceRoot, commitMessage(stage, runId, result.status, deps.trigger));
 
     writeRunLog(workspaceRoot, {
       runId,
@@ -67,6 +77,7 @@ export async function runCommand(workspaceRoot: string, stage: string, deps: Run
       tokenBudget: result.tokenBudget,
       gateSummary: result.gateSummary,
       errorMessage: result.errorMessage,
+      trigger: deps.trigger,
     });
 
     updateStageState(workspaceRoot, stage, {

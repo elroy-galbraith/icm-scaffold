@@ -3,15 +3,22 @@ import { runCommand } from './commands/run.js';
 import { statusCommand } from './commands/status.js';
 import { approveCommand } from './commands/approve.js';
 import { rejectCommand } from './commands/reject.js';
+import type { RunTrigger, TriggerType } from './runLog.js';
+
+const TRIGGER_TYPES: TriggerType[] = ['manual', 'schedule', 'channel'];
 
 function usage(): never {
   console.error(
     [
       'Usage:',
       '  runner run <stage> [--workspace <path>] [--force]',
+      '    [--trigger-type manual|schedule|channel] [--trigger-source <id>]',
       '  runner status [--workspace <path>]',
       '  runner approve <stage> [--workspace <path>]',
       '  runner reject <stage> --comment "<text>" [--workspace <path>]',
+      '',
+      '--trigger-type/--trigger-source record who asked for a run (schedule id or',
+      'channel id) in the run log and commit message. Omit for a manual run.',
     ].join('\n')
   );
   process.exit(1);
@@ -45,6 +52,31 @@ function parseCommentFlag(args: string[]): { comment: string; rest: string[] } {
   return { comment, rest };
 }
 
+function parseTriggerFlags(args: string[]): { trigger?: RunTrigger; rest: string[] } {
+  let rest = args;
+  let type: TriggerType | undefined;
+
+  const typeIdx = rest.indexOf('--trigger-type');
+  if (typeIdx !== -1) {
+    const value = rest[typeIdx + 1];
+    if (!value || !TRIGGER_TYPES.includes(value as TriggerType)) usage();
+    type = value as TriggerType;
+    rest = [...rest.slice(0, typeIdx), ...rest.slice(typeIdx + 2)];
+  }
+
+  let source: string | undefined;
+  const sourceIdx = rest.indexOf('--trigger-source');
+  if (sourceIdx !== -1) {
+    const value = rest[sourceIdx + 1];
+    if (!value) usage();
+    source = value;
+    rest = [...rest.slice(0, sourceIdx), ...rest.slice(sourceIdx + 2)];
+  }
+
+  if (!type) return { rest };
+  return { trigger: source ? { type, source } : { type }, rest };
+}
+
 async function main(): Promise<void> {
   const [command, ...rawArgs] = process.argv.slice(2);
   const { workspaceRoot, rest } = parseWorkspaceFlag(rawArgs);
@@ -52,9 +84,10 @@ async function main(): Promise<void> {
   switch (command) {
     case 'run': {
       const { force, rest: rest2 } = parseForceFlag(rest);
-      const [stage] = rest2;
+      const { trigger, rest: rest3 } = parseTriggerFlags(rest2);
+      const [stage] = rest3;
       if (!stage) usage();
-      await runCommand(workspaceRoot, stage, { force });
+      await runCommand(workspaceRoot, stage, { force, trigger });
       break;
     }
     case 'status': {

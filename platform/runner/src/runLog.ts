@@ -11,6 +11,13 @@ export interface ToolCallLogEntry {
   timestamp: string;
 }
 
+export type TriggerType = 'manual' | 'schedule' | 'channel';
+
+export interface RunTrigger {
+  type: TriggerType;
+  source?: string;
+}
+
 export interface RunLog {
   runId: string;
   stage: string;
@@ -25,6 +32,7 @@ export interface RunLog {
   tokenBudget: number;
   gateSummary?: string;
   errorMessage?: string;
+  trigger?: RunTrigger;
 }
 
 function runsDir(workspaceRoot: string): string {
