@@ -1,8 +1,16 @@
 import express, { type Express } from 'express';
 import cors from 'cors';
 import type { WorkspaceConfig } from './workspace.js';
-import { createPipelineRouter, createRunsRouter, createFilesRouter, createTreeDiffLogRouter } from 'icm-web-shared';
+import {
+  createPipelineRouter,
+  createRunsRouter,
+  createFilesRouter,
+  createTreeDiffLogRouter,
+  createSchedulesRouter,
+  createChannelsRouter,
+} from 'icm-web-shared';
 import { createStageActionsRouter } from './routes/stageActions.js';
+import { createChannelActionsRouter } from './routes/channelActions.js';
 import type { RunnerCli } from './runnerCli.js';
 
 export function createApp(config: WorkspaceConfig, options: { runnerCli?: RunnerCli } = {}): Express {
@@ -14,5 +22,8 @@ export function createApp(config: WorkspaceConfig, options: { runnerCli?: Runner
   app.use(createRunsRouter(config));
   app.use(createFilesRouter(config));
   app.use(createTreeDiffLogRouter(config));
+  app.use(createSchedulesRouter(config));
+  app.use(createChannelsRouter(config));
+  app.use(createChannelActionsRouter(config, options));
   return app;
 }

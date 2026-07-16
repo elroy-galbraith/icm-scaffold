@@ -2,11 +2,19 @@ import { spawn, execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import type { RunTrigger } from 'icm-web-shared';
 
 export interface RunnerCli {
-  runStageInBackground(workspaceRoot: string, stage: string): void;
+  runStageInBackground(workspaceRoot: string, stage: string, trigger?: RunTrigger): void;
   approveStage(workspaceRoot: string, stage: string): Promise<void>;
   rejectStage(workspaceRoot: string, stage: string, comment: string): Promise<void>;
+}
+
+function triggerArgs(trigger?: RunTrigger): string[] {
+  if (!trigger) return [];
+  const args = ['--trigger-type', trigger.type];
+  if (trigger.source) args.push('--trigger-source', trigger.source);
+  return args;
 }
 
 // platform/web/server/src/runnerCli.ts -> platform/runner is a sibling of web/.
@@ -34,10 +42,21 @@ function runnerEnv(): NodeJS.ProcessEnv {
 
 export function createRunnerCli(runnerDir: string = RUNNER_DIR): RunnerCli {
   return {
-    runStageInBackground(workspaceRoot, stage) {
+    runStageInBackground(workspaceRoot, stage, trigger) {
       const child = spawn(
         'npm',
-        ['--prefix', runnerDir, 'run', 'runner', '--', 'run', stage, '--workspace', workspaceRoot],
+        [
+          '--prefix',
+          runnerDir,
+          'run',
+          'runner',
+          '--',
+          'run',
+          stage,
+          '--workspace',
+          workspaceRoot,
+          ...triggerArgs(trigger),
+        ],
         { env: runnerEnv() }
       );
       child.stdout?.on('data', (chunk) => process.stdout.write(`[runner ${stage}] ${chunk}`));

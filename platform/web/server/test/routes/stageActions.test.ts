@@ -45,7 +45,7 @@ describe('stage action routes', () => {
     const res = await request(app).post('/api/stages/03_report/run');
 
     expect(res.status).toBe(202);
-    expect(runnerCli.runStageInBackground).toHaveBeenCalledWith(config.workspaceRoot, '03_report');
+    expect(runnerCli.runStageInBackground).toHaveBeenCalledWith(config.workspaceRoot, '03_report', undefined);
   });
 
   it('POST run returns 409 with the lock holder when the workspace is already locked', async () => {
